@@ -1,9 +1,11 @@
+using System.Text;
 using System.Windows;
 using Microsoft.Win32;
 using UCrew.TTARCH2.Core.Analysis;
 using UCrew.TTARCH2.Core.Extraction;
 using UCrew.TTARCH2.Core.Models;
 using UCrew.TTARCH2.Core.Preview;
+using UCrew.TTARCH2.Core.Rebuild;
 using UCrew.TTARCH2.Core.Reporting;
 
 namespace UCrew.TTARCH2.GUI;
@@ -14,6 +16,7 @@ public partial class MainWindow : Window
     private readonly HexPreviewService _hexPreviewService = new();
     private readonly ChunkTypeDetector _chunkTypeDetector = new();
     private readonly TextPreviewService _textPreviewService = new();
+    private readonly FixedSizeChunkPatchService _patchService = new();
     private ArchiveModel? _currentArchive;
     private ChunkTypeInfo? _selectedChunkType;
 
@@ -201,6 +204,69 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void PatchTextToCopy_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentArchive is null || !TextEditor.IsEnabled || ChunksGrid.SelectedItem is not ChunkModel chunk)
+        {
+            MessageBox.Show(this, "Önce tam olarak açılmış bir metin chunkı seçmelisin.", "Arşiv Kopyasına Uygula", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        int editedByteCount = Encoding.UTF8.GetByteCount(TextEditor.Text);
+        if (editedByteCount != chunk.Length)
+        {
+            MessageBox.Show(
+                this,
+                $"Geri yazma için UTF-8 bayt boyutu birebir aynı olmalı.\n\nChunk boyutu: {chunk.Length:N0} bayt\nDüzenlenmiş metin: {editedByteCount:N0} bayt",
+                "Boyut Uyuşmazlığı",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        SaveFileDialog dialog = new()
+        {
+            Title = "Düzenlenmiş arşiv kopyasını kaydet",
+            Filter = "TTARCH2 dosyası (*.ttarch2)|*.ttarch2|Tüm dosyalar (*.*)|*.*",
+            FileName = Path.GetFileNameWithoutExtension(_currentArchive.FileName) + ".patched.ttarch2",
+            AddExtension = true,
+            DefaultExt = ".ttarch2"
+        };
+
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        try
+        {
+            SetBusy(true, "Arşiv kopyalanıyor ve seçili chunk güncelleniyor...");
+            await _patchService.PatchTextToCopyAsync(_currentArchive, chunk, TextEditor.Text, dialog.FileName);
+            StatusText.Text = $"Düzenlenmiş arşiv kopyası oluşturuldu: {dialog.FileName}";
+            MessageBox.Show(this, "Orijinal arşiv değiştirilmedi. Düzenleme yeni kopyaya uygulandı.", "İşlem Tamamlandı", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "Arşiv kopyasına uygulama başarısız.";
+            MessageBox.Show(this, ex.Message, "Geri Yazma Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            SetBusy(false, StatusText.Text);
+        }
+    }
+
+    private void TextEditor_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (ChunksGrid.SelectedItem is not ChunkModel chunk || !TextEditor.IsEnabled)
+        {
+            TextByteCountInfo.Text = "UTF-8 boyutu: -";
+            return;
+        }
+
+        int bytes = Encoding.UTF8.GetByteCount(TextEditor.Text);
+        string state = bytes == chunk.Length ? "UYUMLU" : "UYUŞMUYOR";
+        TextByteCountInfo.Text = $"UTF-8 boyutu: {bytes:N0} / {chunk.Length:N0} bayt — {state}";
+    }
+
     private async void ChunksGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         if (_currentArchive is null || ChunksGrid.SelectedItem is not ChunkModel chunk)
@@ -221,14 +287,18 @@ public partial class MainWindow : Window
             SelectedChunkTypeText.Text = $"{_selectedChunkType.Name} / {_selectedChunkType.Category} / güven {_selectedChunkType.Confidence:0.00}";
 
             bool isText = string.Equals(_selectedChunkType.Category, "Text", StringComparison.OrdinalIgnoreCase);
-            TextEditor.IsEnabled = isText;
-            TextEditor.Text = isText
+            bool canLoadEntireText = isText && chunk.Length <= TextPreviewService.DefaultPreviewLength;
+            TextEditor.IsEnabled = canLoadEntireText;
+            TextEditor.Text = canLoadEntireText
                 ? await _textPreviewService.ReadChunkTextAsync(_currentArchive, chunk)
                 : string.Empty;
-            TextPreviewInfo.Text = isText
-                ? "Metin UTF-8 olarak açıldı. Kaydetme işlemi arşivi değiştirmez; ayrı dosya oluşturur."
-                : "Seçili chunk metin olarak algılanmadı.";
+            TextPreviewInfo.Text = canLoadEntireText
+                ? "Metin UTF-8 olarak tam açıldı. Aynı bayt boyutunda kalırsa arşiv kopyasına uygulanabilir."
+                : isText
+                    ? "Chunk 256 KB sınırını aştığı için güvenli düzenleme devre dışı."
+                    : "Seçili chunk metin olarak algılanmadı.";
 
+            TextEditor_TextChanged(TextEditor, new System.Windows.Controls.TextChangedEventArgs(System.Windows.Controls.TextBox.TextChangedEvent, UndoAction.None));
             StatusText.Text = $"Chunk {chunk.Index} önizlemesi hazır.";
         }
         catch (Exception ex)
@@ -266,6 +336,7 @@ public partial class MainWindow : Window
         TextEditor.Clear();
         TextEditor.IsEnabled = false;
         TextPreviewInfo.Text = "Metin türünde bir chunk seçilmedi.";
+        TextByteCountInfo.Text = "UTF-8 boyutu: -";
     }
 
     private void SetBusy(bool isBusy, string message)
