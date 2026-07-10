@@ -12,7 +12,9 @@ public partial class MainWindow : Window
 {
     private readonly ArchiveAnalysisService _analysisService = new();
     private readonly HexPreviewService _hexPreviewService = new();
+    private readonly ChunkTypeDetector _chunkTypeDetector = new();
     private ArchiveModel? _currentArchive;
+    private ChunkTypeInfo? _selectedChunkType;
 
     public MainWindow()
     {
@@ -43,6 +45,7 @@ public partial class MainWindow : Window
 
             ArchiveModel archive = await _analysisService.AnalyzeAsync(filePath);
             _currentArchive = archive;
+            _selectedChunkType = null;
             DisplayArchive(archive);
 
             StatusText.Text = $"Analiz tamamlandı: {archive.Chunks.Count:N0} chunk bulundu.";
@@ -50,6 +53,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             _currentArchive = null;
+            _selectedChunkType = null;
             StatusText.Text = "Analiz başarısız.";
             MessageBox.Show(this, ex.Message, "Analiz Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -136,22 +140,73 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void ExportSelectedChunk_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentArchive is null || ChunksGrid.SelectedItem is not ChunkModel chunk)
+        {
+            MessageBox.Show(this, "Önce bir chunk seçmelisin.", "Chunk Kaydet", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        _selectedChunkType ??= await _chunkTypeDetector.DetectAsync(_currentArchive, chunk);
+
+        SaveFileDialog dialog = new()
+        {
+            Title = "Seçili chunkı kaydet",
+            Filter = $"{_selectedChunkType.Name} (*{_selectedChunkType.Extension})|*{_selectedChunkType.Extension}|Tüm dosyalar (*.*)|*.*",
+            FileName = $"chunk_{chunk.Index:D4}_0x{chunk.Offset:X}{_selectedChunkType.Extension}",
+            AddExtension = true,
+            DefaultExt = _selectedChunkType.Extension
+        };
+
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        try
+        {
+            SetBusy(true, "Seçili chunk kaydediliyor...");
+            await new SingleChunkExportService().ExportAsync(_currentArchive, chunk, dialog.FileName);
+            StatusText.Text = $"Chunk kaydedildi: {dialog.FileName}";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "Seçili chunk kaydedilemedi.";
+            MessageBox.Show(this, ex.Message, "Chunk Kaydetme Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            SetBusy(false, StatusText.Text);
+        }
+    }
+
     private async void ChunksGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         if (_currentArchive is null || ChunksGrid.SelectedItem is not ChunkModel chunk)
         {
+            _selectedChunkType = null;
+            SelectedChunkTypeText.Text = "-";
             HexPreviewText.Clear();
             return;
         }
 
         try
         {
-            StatusText.Text = $"Chunk {chunk.Index} önizleniyor...";
-            HexPreviewText.Text = await _hexPreviewService.CreateChunkPreviewAsync(_currentArchive, chunk);
+            StatusText.Text = $"Chunk {chunk.Index} analiz ediliyor...";
+
+            Task<string> previewTask = _hexPreviewService.CreateChunkPreviewAsync(_currentArchive, chunk);
+            Task<ChunkTypeInfo> typeTask = _chunkTypeDetector.DetectAsync(_currentArchive, chunk);
+
+            await Task.WhenAll(previewTask, typeTask);
+
+            _selectedChunkType = typeTask.Result;
+            HexPreviewText.Text = previewTask.Result;
+            SelectedChunkTypeText.Text = $"{_selectedChunkType.Name} / {_selectedChunkType.Category} / güven {_selectedChunkType.Confidence:0.00}";
             StatusText.Text = $"Chunk {chunk.Index} önizlemesi hazır.";
         }
         catch (Exception ex)
         {
+            _selectedChunkType = null;
+            SelectedChunkTypeText.Text = "Bilinmiyor";
             HexPreviewText.Text = $"Önizleme hatası: {ex.Message}";
             StatusText.Text = "Chunk önizleme başarısız.";
         }
@@ -177,6 +232,7 @@ public partial class MainWindow : Window
 
         ChunksGrid.ItemsSource = archive.Chunks;
         SignaturesGrid.ItemsSource = archive.Signatures;
+        SelectedChunkTypeText.Text = "-";
         HexPreviewText.Clear();
     }
 
