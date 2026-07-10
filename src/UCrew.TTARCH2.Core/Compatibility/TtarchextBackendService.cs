@@ -108,6 +108,7 @@ public sealed class TtarchextBackendService
                 Name = relative,
                 RelativePath = relative,
                 ExtractedPath = info.FullName,
+                ExtractionRoot = extractionDirectory,
                 Extension = extension,
                 Offset = -1,
                 Size = info.Length,
