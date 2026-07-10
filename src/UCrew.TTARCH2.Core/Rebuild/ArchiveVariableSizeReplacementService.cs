@@ -6,6 +6,7 @@ namespace UCrew.TTARCH2.Core.Rebuild;
 public sealed class ArchiveVariableSizeReplacementService
 {
     private const int BufferSize = 128 * 1024;
+    private const double MinimumTableFieldConfidence = 0.60;
 
     public async Task<ArchiveVariableSizeReplacementResult> ReplaceToCopyAsync(
         ArchiveModel archive,
@@ -52,10 +53,33 @@ public sealed class ArchiveVariableSizeReplacementService
             .OrderBy(x => x.SourceOffset)
             .ToList();
 
-        if (delta != 0 && affectedPointers.Count == 0)
+        List<ArchiveTableField> selectedSizeFields = archive.TableFields
+            .Where(x => x.ResourceIndex == resource.Index)
+            .Where(x => x.Kind == "Size")
+            .Where(x => x.Confidence >= MinimumTableFieldConfidence)
+            .ToList();
+
+        HashSet<int> followingResourceIndexes = archive.Resources
+            .Where(x => x.Offset > resource.Offset)
+            .Select(x => x.Index)
+            .ToHashSet();
+
+        List<ArchiveTableField> followingOffsetFields = archive.TableFields
+            .Where(x => followingResourceIndexes.Contains(x.ResourceIndex))
+            .Where(x => x.Kind == "Offset")
+            .Where(x => x.Confidence >= MinimumTableFieldConfidence)
+            .ToList();
+
+        if (delta != 0 && selectedSizeFields.Count == 0)
+        {
+            result.Errors.Add("No high-confidence TTARCH2 size field was found for the selected LANDb resource.");
+            return result;
+        }
+
+        if (delta != 0 && affectedPointers.Count == 0 && followingOffsetFields.Count == 0)
         {
             result.Errors.Add(
-                "Archive size changes, but no pointer fields after the replaced resource were identified.");
+                "Archive size changes, but no following pointer or TTARCH2 offset fields were identified.");
             return result;
         }
 
@@ -66,7 +90,16 @@ public sealed class ArchiveVariableSizeReplacementService
         await RebuildFileAsync(sourcePath, replacementPath, destinationPath, resource, token)
             .ConfigureAwait(false);
 
-        await PatchPointersAsync(destinationPath, resource, delta, affectedPointers, result, token)
+        await PatchMetadataAsync(
+                destinationPath,
+                resource,
+                replacementSize,
+                delta,
+                affectedPointers,
+                followingOffsetFields,
+                selectedSizeFields,
+                result,
+                token)
             .ConfigureAwait(false);
 
         result.OutputFileSize = new FileInfo(destinationPath).Length;
@@ -96,7 +129,7 @@ public sealed class ArchiveVariableSizeReplacementService
         if (delta != 0)
         {
             result.Warnings.Add(
-                "Variable-size TTARCH2 replacement is experimental until the exact file table and compressed block metadata are confirmed for this game build.");
+                "Variable-size TTARCH2 replacement remains experimental until compressed block metadata is confirmed for this game build.");
         }
 
         return result;
@@ -143,11 +176,14 @@ public sealed class ArchiveVariableSizeReplacementService
         await destination.FlushAsync(token).ConfigureAwait(false);
     }
 
-    private static async Task PatchPointersAsync(
+    private static async Task PatchMetadataAsync(
         string destinationPath,
         ArchiveResourceEntry resource,
+        long replacementSize,
         long delta,
         IReadOnlyList<PointerHit> pointers,
+        IReadOnlyList<ArchiveTableField> followingOffsetFields,
+        IReadOnlyList<ArchiveTableField> selectedSizeFields,
         ArchiveVariableSizeReplacementResult result,
         CancellationToken token)
     {
@@ -159,41 +195,82 @@ public sealed class ArchiveVariableSizeReplacementService
             BufferSize,
             FileOptions.Asynchronous | FileOptions.RandomAccess);
 
+        HashSet<long> writtenFieldOffsets = new();
+
+        foreach (ArchiveTableField field in selectedSizeFields)
+        {
+            long newFieldOffset = MapMetadataOffset(field.FieldOffset, resource, delta);
+            await WriteIntegerAsync(stream, newFieldOffset, field.FieldSize, replacementSize, token)
+                .ConfigureAwait(false);
+            writtenFieldOffsets.Add(newFieldOffset);
+            result.UpdatedSizeFieldCount++;
+        }
+
+        foreach (ArchiveTableField field in followingOffsetFields)
+        {
+            long newFieldOffset = MapMetadataOffset(field.FieldOffset, resource, delta);
+            long newValue = field.StoredValue + delta;
+            await WriteIntegerAsync(stream, newFieldOffset, field.FieldSize, newValue, token)
+                .ConfigureAwait(false);
+            writtenFieldOffsets.Add(newFieldOffset);
+            result.UpdatedOffsetFieldCount++;
+        }
+
         foreach (PointerHit pointer in pointers)
         {
             token.ThrowIfCancellationRequested();
 
-            long newSourceOffset = pointer.SourceOffset > resource.Offset
-                ? pointer.SourceOffset + delta
-                : pointer.SourceOffset;
+            long newSourceOffset = MapMetadataOffset(pointer.SourceOffset, resource, delta);
             long newTargetOffset = pointer.TargetOffset + delta;
 
-            if (newSourceOffset < 0 || newSourceOffset + pointer.Size > stream.Length)
-            {
-                result.Errors.Add($"Pointer field moved outside archive bounds at 0x{newSourceOffset:X}.");
+            if (writtenFieldOffsets.Contains(newSourceOffset))
                 continue;
-            }
 
-            byte[] buffer = new byte[pointer.Size];
-            switch (pointer.Size)
-            {
-                case 4 when newTargetOffset <= uint.MaxValue:
-                    BinaryPrimitives.WriteUInt32LittleEndian(buffer, (uint)newTargetOffset);
-                    break;
-                case 8:
-                    BinaryPrimitives.WriteUInt64LittleEndian(buffer, (ulong)newTargetOffset);
-                    break;
-                default:
-                    result.Errors.Add($"Unsupported pointer field size {pointer.Size} at 0x{pointer.SourceOffset:X}.");
-                    continue;
-            }
-
-            stream.Position = newSourceOffset;
-            await stream.WriteAsync(buffer, token).ConfigureAwait(false);
+            await WriteIntegerAsync(stream, newSourceOffset, pointer.Size, newTargetOffset, token)
+                .ConfigureAwait(false);
+            writtenFieldOffsets.Add(newSourceOffset);
             result.UpdatedPointerCount++;
         }
 
         await stream.FlushAsync(token).ConfigureAwait(false);
+    }
+
+    private static long MapMetadataOffset(long originalFieldOffset, ArchiveResourceEntry resource, long delta)
+    {
+        return originalFieldOffset >= resource.Offset + resource.Size
+            ? originalFieldOffset + delta
+            : originalFieldOffset;
+    }
+
+    private static async Task WriteIntegerAsync(
+        FileStream stream,
+        long offset,
+        int size,
+        long value,
+        CancellationToken token)
+    {
+        if (offset < 0 || offset + size > stream.Length)
+            throw new InvalidDataException($"TTARCH2 metadata field is outside rebuilt archive bounds at 0x{offset:X}.");
+
+        byte[] buffer = new byte[size];
+
+        switch (size)
+        {
+            case 2 when value >= 0 && value <= ushort.MaxValue:
+                BinaryPrimitives.WriteUInt16LittleEndian(buffer, (ushort)value);
+                break;
+            case 4 when value >= 0 && value <= uint.MaxValue:
+                BinaryPrimitives.WriteUInt32LittleEndian(buffer, (uint)value);
+                break;
+            case 8 when value >= 0:
+                BinaryPrimitives.WriteUInt64LittleEndian(buffer, (ulong)value);
+                break;
+            default:
+                throw new InvalidDataException($"Unsupported TTARCH2 metadata field size/value: {size} bytes, {value}.");
+        }
+
+        stream.Position = offset;
+        await stream.WriteAsync(buffer, token).ConfigureAwait(false);
     }
 
     private static async Task VerifyReplacementAsync(
