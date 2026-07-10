@@ -15,6 +15,7 @@ try
     string archivePath = args[0];
     string? reportPath = null;
     string? dumpDirectory = null;
+    string? landbTextPath = null;
 
     for (int i = 1; i < args.Length; i++)
     {
@@ -26,6 +27,10 @@ try
 
             case "--dump-chunks" when i + 1 < args.Length:
                 dumpDirectory = args[++i];
+                break;
+
+            case "--export-landb-text" when i + 1 < args.Length:
+                landbTextPath = args[++i];
                 break;
 
             default:
@@ -44,6 +49,7 @@ try
         .Register(new PointerScanner())
         .Register(new SignatureScanner())
         .Register(new EcttAnalyzer())
+        .Register(new LandbAnalyzer())
         .Register(new RegionDetector());
 
     await pipeline.ExecuteAsync(analysisContext);
@@ -53,9 +59,10 @@ try
 
     int dumpedChunks = 0;
     if (!string.IsNullOrWhiteSpace(dumpDirectory))
-    {
         dumpedChunks = await new ChunkDumpService().DumpAsync(archive, dumpDirectory);
-    }
+
+    if (!string.IsNullOrWhiteSpace(landbTextPath))
+        await new LandbTextExportService().ExportAsync(archive, landbTextPath);
 
     Console.WriteLine($"File       : {archive.FileName}");
     Console.WriteLine($"Size       : {archive.FileSize:n0} bytes");
@@ -67,12 +74,17 @@ try
     Console.WriteLine($"Pointers   : {archive.Pointers.Count:n0} candidates");
     Console.WriteLine($"Signatures : {archive.Signatures.Count:n0} hits");
     Console.WriteLine($"ECTT       : {(archive.Ectt.LooksLikeEctt ? "yes" : "no")} / confidence {archive.Ectt.Confidence:0.00}");
+    Console.WriteLine($"LANDb      : {(archive.Landb.LooksLikeLandb ? "yes" : "no")} / confidence {archive.Landb.Confidence:0.00}");
+    Console.WriteLine($"LANDb Text : {archive.Landb.TextCandidates.Count:n0} candidates");
     Console.WriteLine($"Chunks     : {archive.Chunks.Count:n0} candidates");
     Console.WriteLine($"Regions    : {archive.Regions.Count:n0} candidates");
     Console.WriteLine($"Report     : {reportPath}");
 
     if (dumpDirectory is not null)
         Console.WriteLine($"Dumped     : {dumpedChunks:n0} chunks -> {Path.GetFullPath(dumpDirectory)}");
+
+    if (landbTextPath is not null)
+        Console.WriteLine($"LANDb TXT  : {Path.GetFullPath(landbTextPath)}");
 
     return archive.Validation.Success ? 0 : 2;
 }
@@ -85,5 +97,5 @@ catch (Exception ex)
 static void PrintUsage()
 {
     Console.WriteLine("Usage:");
-    Console.WriteLine("  UCrew.TTARCH2.CLI <archive-path> [--report <json-path>] [--dump-chunks <directory>]");
+    Console.WriteLine("  UCrew.TTARCH2.CLI <archive-path> [--report <json-path>] [--dump-chunks <directory>] [--export-landb-text <txt-path>]");
 }
