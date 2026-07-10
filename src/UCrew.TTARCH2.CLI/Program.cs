@@ -1,6 +1,7 @@
 using UCrew.TTARCH2.Core;
 using UCrew.TTARCH2.Core.Analysis;
 using UCrew.TTARCH2.Core.Extraction;
+using UCrew.TTARCH2.Core.Import;
 using UCrew.TTARCH2.Core.Models;
 using UCrew.TTARCH2.Core.Reporting;
 
@@ -16,6 +17,7 @@ try
     string? reportPath = null;
     string? dumpDirectory = null;
     string? landbTextPath = null;
+    string? validateLandbTextPath = null;
 
     for (int i = 1; i < args.Length; i++)
     {
@@ -31,6 +33,10 @@ try
 
             case "--export-landb-text" when i + 1 < args.Length:
                 landbTextPath = args[++i];
+                break;
+
+            case "--validate-landb-text" when i + 1 < args.Length:
+                validateLandbTextPath = args[++i];
                 break;
 
             default:
@@ -64,6 +70,10 @@ try
     if (!string.IsNullOrWhiteSpace(landbTextPath))
         await new LandbTextExportService().ExportAsync(archive, landbTextPath);
 
+    LandbTextImportResult? validation = null;
+    if (!string.IsNullOrWhiteSpace(validateLandbTextPath))
+        validation = await new LandbTextImportService().ValidateAsync(archive, validateLandbTextPath);
+
     Console.WriteLine($"File       : {archive.FileName}");
     Console.WriteLine($"Size       : {archive.FileSize:n0} bytes");
     Console.WriteLine($"Magic      : {archive.Header.Magic}");
@@ -86,6 +96,21 @@ try
     if (landbTextPath is not null)
         Console.WriteLine($"LANDb TXT  : {Path.GetFullPath(landbTextPath)}");
 
+    if (validation is not null)
+    {
+        Console.WriteLine($"TXT Check  : {(validation.Success ? "PASS" : "FAIL")}");
+        Console.WriteLine($"Lines      : {validation.ActualLineCount:n0} / {validation.ExpectedLineCount:n0}");
+
+        foreach (string error in validation.Errors)
+            Console.Error.WriteLine($"ERROR: {error}");
+
+        foreach (string warning in validation.Warnings)
+            Console.WriteLine($"WARNING: {warning}");
+    }
+
+    if (validation is { Success: false })
+        return 4;
+
     return archive.Validation.Success ? 0 : 2;
 }
 catch (Exception ex)
@@ -97,5 +122,5 @@ catch (Exception ex)
 static void PrintUsage()
 {
     Console.WriteLine("Usage:");
-    Console.WriteLine("  UCrew.TTARCH2.CLI <archive-path> [--report <json-path>] [--dump-chunks <directory>] [--export-landb-text <txt-path>]");
+    Console.WriteLine("  UCrew.TTARCH2.CLI <archive-path> [--report <json-path>] [--dump-chunks <directory>] [--export-landb-text <txt-path>] [--validate-landb-text <translated-txt-path>]");
 }
