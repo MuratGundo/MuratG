@@ -9,6 +9,9 @@
             <MenuItem Header="_Dosya">
                 <MenuItem Header="_Arşiv Aç..." Click="OpenArchive_Click" />
                 <Separator />
+                <MenuItem Header="_JSON Raporunu Kaydet..." Click="SaveReport_Click" />
+                <MenuItem Header="_Chunkları Dışarı Çıkar..." Click="DumpChunks_Click" />
+                <Separator />
                 <MenuItem Header="Çı_kış" Click="Exit_Click" />
             </MenuItem>
         </Menu>
