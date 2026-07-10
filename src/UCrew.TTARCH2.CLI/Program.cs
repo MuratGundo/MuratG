@@ -21,7 +21,7 @@ try
         .Register(new EntropyAnalyzer())
         .Register(new PointerScanner())
         .Register(new SignatureScanner())
-        .Register(new ECTTAnalyzer())
+        .Register(new EcttAnalyzer())
         .Register(new RegionDetector());
 
     await pipeline.ExecuteAsync(analysisContext);
@@ -41,7 +41,8 @@ try
     Console.WriteLine($"Entropy    : {archive.EntropyMap.Count:n0} blocks");
     Console.WriteLine($"Pointers   : {archive.Pointers.Count:n0} candidates");
     Console.WriteLine($"Signatures : {archive.Signatures.Count:n0} hits");
-    Console.WriteLine($"ECTTChunks : {archive.ECTTChunks.Count:n0} candidates");
+    Console.WriteLine($"ECTT       : {(archive.Ectt.LooksLikeEctt ? "yes" : "no")} / confidence {archive.Ectt.Confidence:0.00}");
+    Console.WriteLine($"Chunks     : {archive.Chunks.Count:n0} candidates");
     Console.WriteLine($"Regions    : {archive.Regions.Count:n0} candidates");
     Console.WriteLine($"Report     : {reportPath}");
 
