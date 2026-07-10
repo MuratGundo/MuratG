@@ -26,5 +26,9 @@ public sealed class ArchiveModel
 
     public List<ArchiveResourceEntry> Resources { get; } = new();
 
+    public List<ArchiveTableField> TableFields { get; } = new();
+
+    public List<ArchiveCompressionBlock> CompressionBlocks { get; } = new();
+
     public ValidationResult Validation { get; } = new();
 }
