@@ -2,9 +2,11 @@ namespace UCrew.TTARCH2.Core.Rebuild;
 
 public sealed class LandbVariableLengthRebuildResult
 {
-    public bool Success => Errors.Count == 0 && Plan.CanRebuild;
+    public bool Success => Errors.Count == 0 && Plan.CanRebuild && Verification is { Success: true };
 
     public required LandbRebuildPlan Plan { get; init; }
+
+    public LandbPostBuildVerificationResult? Verification { get; set; }
 
     public string OutputPath { get; init; } = string.Empty;
 
