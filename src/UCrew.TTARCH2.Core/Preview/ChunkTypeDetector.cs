@@ -39,19 +39,19 @@ public sealed class ChunkTypeDetector
 
         ReadOnlySpan<byte> span = data.AsSpan(0, total);
 
-        if (StartsWith(span, "DDS "))
+        if (StartsWithAscii(span, "DDS "))
             return New("DDS Texture", ".dds", "Texture", 1.0);
-        if (span.StartsWith([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))
+        if (StartsWithBytes(span, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A))
             return New("PNG Image", ".png", "Image", 1.0);
-        if (StartsWith(span, "OggS"))
+        if (StartsWithAscii(span, "OggS"))
             return New("Ogg Audio", ".ogg", "Audio", 1.0);
-        if (StartsWith(span, "RIFF"))
+        if (StartsWithAscii(span, "RIFF"))
             return New("RIFF Container", ".riff", "Audio/Container", 0.95);
-        if (span.StartsWith([0x78, 0x9C]) || span.StartsWith([0x78, 0xDA]))
+        if (StartsWithBytes(span, 0x78, 0x9C) || StartsWithBytes(span, 0x78, 0xDA))
             return New("Zlib Stream", ".zlib", "Compression", 0.90);
-        if (span.StartsWith([0x28, 0xB5, 0x2F, 0xFD]))
+        if (StartsWithBytes(span, 0x28, 0xB5, 0x2F, 0xFD))
             return New("Zstandard Stream", ".zst", "Compression", 1.0);
-        if (span.StartsWith([0x04, 0x22, 0x4D, 0x18]))
+        if (StartsWithBytes(span, 0x04, 0x22, 0x4D, 0x18))
             return New("LZ4 Frame", ".lz4", "Compression", 1.0);
 
         double printableRatio = GetPrintableRatio(span);
@@ -68,9 +68,17 @@ public sealed class ChunkTypeDetector
         return New("Unknown Binary", ".bin", "Binary", 0.25);
     }
 
-    private static bool StartsWith(ReadOnlySpan<byte> data, string value)
+    private static bool StartsWithAscii(ReadOnlySpan<byte> data, string value)
     {
-        return data.StartsWith(Encoding.ASCII.GetBytes(value));
+        byte[] expected = Encoding.ASCII.GetBytes(value);
+        return data.Length >= expected.Length
+            && data[..expected.Length].SequenceEqual(expected);
+    }
+
+    private static bool StartsWithBytes(ReadOnlySpan<byte> data, params byte[] expected)
+    {
+        return data.Length >= expected.Length
+            && data[..expected.Length].SequenceEqual(expected);
     }
 
     private static double GetPrintableRatio(ReadOnlySpan<byte> data)
