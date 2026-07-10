@@ -1,13 +1,16 @@
 using System.Windows;
 using Microsoft.Win32;
 using UCrew.TTARCH2.Core.Analysis;
+using UCrew.TTARCH2.Core.Extraction;
 using UCrew.TTARCH2.Core.Models;
+using UCrew.TTARCH2.Core.Reporting;
 
 namespace UCrew.TTARCH2.GUI;
 
 public partial class MainWindow : Window
 {
     private readonly ArchiveAnalysisService _analysisService = new();
+    private ArchiveModel? _currentArchive;
 
     public MainWindow()
     {
@@ -37,14 +40,93 @@ public partial class MainWindow : Window
             SetBusy(true, "Dosya analiz ediliyor...");
 
             ArchiveModel archive = await _analysisService.AnalyzeAsync(filePath);
+            _currentArchive = archive;
             DisplayArchive(archive);
 
             StatusText.Text = $"Analiz tamamlandı: {archive.Chunks.Count:N0} chunk bulundu.";
         }
         catch (Exception ex)
         {
+            _currentArchive = null;
             StatusText.Text = "Analiz başarısız.";
             MessageBox.Show(this, ex.Message, "Analiz Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            SetBusy(false, StatusText.Text);
+        }
+    }
+
+    private async void SaveReport_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentArchive is null)
+        {
+            MessageBox.Show(this, "Önce bir arşiv açmalısın.", "Rapor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        SaveFileDialog dialog = new()
+        {
+            Title = "JSON analiz raporunu kaydet",
+            Filter = "JSON dosyası (*.json)|*.json",
+            FileName = Path.GetFileNameWithoutExtension(_currentArchive.FileName) + ".analysis.json",
+            AddExtension = true,
+            DefaultExt = ".json"
+        };
+
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        try
+        {
+            SetBusy(true, "JSON raporu kaydediliyor...");
+            await new JsonReportWriter().WriteAsync(_currentArchive, dialog.FileName);
+            StatusText.Text = $"Rapor kaydedildi: {dialog.FileName}";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "Rapor kaydedilemedi.";
+            MessageBox.Show(this, ex.Message, "Rapor Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            SetBusy(false, StatusText.Text);
+        }
+    }
+
+    private async void DumpChunks_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentArchive is null)
+        {
+            MessageBox.Show(this, "Önce bir arşiv açmalısın.", "Chunk Çıkarma", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (_currentArchive.Chunks.Count == 0)
+        {
+            MessageBox.Show(this, "Çıkarılabilecek chunk bulunamadı.", "Chunk Çıkarma", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        OpenFolderDialog dialog = new()
+        {
+            Title = "Chunkların çıkarılacağı klasörü seç",
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        try
+        {
+            SetBusy(true, "Chunklar dışarı çıkarılıyor...");
+            int count = await new ChunkDumpService().DumpAsync(_currentArchive, dialog.FolderName);
+            StatusText.Text = $"{count:N0} chunk dışarı çıkarıldı.";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "Chunk çıkarma başarısız.";
+            MessageBox.Show(this, ex.Message, "Chunk Çıkarma Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
