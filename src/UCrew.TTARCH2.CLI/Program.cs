@@ -21,6 +21,8 @@ try
     string? validateLandbTextPath = null;
     string? importLandbTextPath = null;
     string? importLandbOutputPath = null;
+    string? rebuildLandbTextPath = null;
+    string? rebuildLandbOutputPath = null;
 
     for (int i = 1; i < args.Length; i++)
     {
@@ -47,6 +49,11 @@ try
                 importLandbOutputPath = args[++i];
                 break;
 
+            case "--rebuild-landb-text" when i + 2 < args.Length:
+                rebuildLandbTextPath = args[++i];
+                rebuildLandbOutputPath = args[++i];
+                break;
+
             default:
                 throw new ArgumentException($"Unknown or incomplete argument: {args[i]}");
         }
@@ -64,6 +71,7 @@ try
         .Register(new SignatureScanner())
         .Register(new EcttAnalyzer())
         .Register(new LandbAnalyzer())
+        .Register(new LandbLengthFieldAnalyzer())
         .Register(new RegionDetector());
 
     await pipeline.ExecuteAsync(analysisContext);
@@ -89,6 +97,13 @@ try
             .ImportToCopyAsync(archive, importLandbTextPath, importLandbOutputPath);
     }
 
+    LandbVariableLengthRebuildResult? rebuildResult = null;
+    if (!string.IsNullOrWhiteSpace(rebuildLandbTextPath) && !string.IsNullOrWhiteSpace(rebuildLandbOutputPath))
+    {
+        rebuildResult = await new LandbVariableLengthRebuildService()
+            .RebuildAsync(archive, rebuildLandbTextPath, rebuildLandbOutputPath);
+    }
+
     Console.WriteLine($"File       : {archive.FileName}");
     Console.WriteLine($"Size       : {archive.FileSize:n0} bytes");
     Console.WriteLine($"Magic      : {archive.Header.Magic}");
@@ -101,6 +116,7 @@ try
     Console.WriteLine($"ECTT       : {(archive.Ectt.LooksLikeEctt ? "yes" : "no")} / confidence {archive.Ectt.Confidence:0.00}");
     Console.WriteLine($"LANDb      : {(archive.Landb.LooksLikeLandb ? "yes" : "no")} / confidence {archive.Landb.Confidence:0.00}");
     Console.WriteLine($"LANDb Text : {archive.Landb.TextCandidates.Count:n0} candidates");
+    Console.WriteLine($"Length Fld : {archive.Landb.LengthFieldCandidates.Count:n0} candidates");
     Console.WriteLine($"Chunks     : {archive.Chunks.Count:n0} candidates");
     Console.WriteLine($"Regions    : {archive.Regions.Count:n0} candidates");
     Console.WriteLine($"Report     : {reportPath}");
@@ -115,10 +131,8 @@ try
     {
         Console.WriteLine($"TXT Check  : {(validation.Success ? "PASS" : "FAIL")}");
         Console.WriteLine($"Lines      : {validation.ActualLineCount:n0} / {validation.ExpectedLineCount:n0}");
-
         foreach (string error in validation.Errors)
             Console.Error.WriteLine($"ERROR: {error}");
-
         foreach (string warning in validation.Warnings)
             Console.WriteLine($"WARNING: {warning}");
     }
@@ -127,19 +141,35 @@ try
     {
         Console.WriteLine($"LANDb Import: {(importResult.Success ? "PASS" : "FAIL")}");
         Console.WriteLine($"Import Lines: {importResult.ActualLineCount:n0} / {importResult.ExpectedLineCount:n0}");
-
         foreach (string error in importResult.Errors)
             Console.Error.WriteLine($"ERROR: {error}");
-
         foreach (string warning in importResult.Warnings)
             Console.WriteLine($"WARNING: {warning}");
-
         if (importResult.Success && importLandbOutputPath is not null)
             Console.WriteLine($"Output LANDb: {Path.GetFullPath(importLandbOutputPath)}");
     }
 
-    if (validation is { Success: false } || importResult is { Success: false })
+    if (rebuildResult is not null)
+    {
+        Console.WriteLine($"LANDb Rebuild: {(rebuildResult.Success ? "PASS" : "FAIL")}");
+        Console.WriteLine($"Planned Size : {rebuildResult.Plan.PlannedFileSize:n0}");
+        Console.WriteLine($"Output Size  : {rebuildResult.OutputFileSize:n0}");
+        Console.WriteLine($"Pointers     : {rebuildResult.UpdatedPointerCount:n0} updated");
+        Console.WriteLine($"Length Fields: {rebuildResult.UpdatedLengthFieldCount:n0} updated");
+        foreach (string error in rebuildResult.Errors)
+            Console.Error.WriteLine($"ERROR: {error}");
+        foreach (string warning in rebuildResult.Warnings)
+            Console.WriteLine($"WARNING: {warning}");
+        if (rebuildResult.Success)
+            Console.WriteLine($"Output LANDb : {rebuildResult.OutputPath}");
+    }
+
+    if (validation is { Success: false }
+        || importResult is { Success: false }
+        || rebuildResult is { Success: false })
+    {
         return 4;
+    }
 
     return archive.Validation.Success ? 0 : 2;
 }
@@ -152,5 +182,5 @@ catch (Exception ex)
 static void PrintUsage()
 {
     Console.WriteLine("Usage:");
-    Console.WriteLine("  UCrew.TTARCH2.CLI <archive-path> [--report <json-path>] [--dump-chunks <directory>] [--export-landb-text <txt-path>] [--validate-landb-text <translated-txt-path>] [--import-landb-text <translated-txt-path> <output-landb-path>]");
+    Console.WriteLine("  UCrew.TTARCH2.CLI <archive-path> [--report <json-path>] [--dump-chunks <directory>] [--export-landb-text <txt-path>] [--validate-landb-text <translated-txt-path>] [--import-landb-text <translated-txt-path> <output-landb-path>] [--rebuild-landb-text <translated-txt-path> <output-landb-path>]");
 }
