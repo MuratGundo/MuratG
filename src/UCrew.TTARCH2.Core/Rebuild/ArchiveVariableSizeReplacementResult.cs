@@ -14,6 +14,10 @@ public sealed class ArchiveVariableSizeReplacementResult
 
     public int UpdatedPointerCount { get; set; }
 
+    public int UpdatedOffsetFieldCount { get; set; }
+
+    public int UpdatedSizeFieldCount { get; set; }
+
     public List<string> Errors { get; } = new();
 
     public List<string> Warnings { get; } = new();
