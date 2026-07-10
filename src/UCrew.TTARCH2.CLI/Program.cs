@@ -3,6 +3,7 @@ using UCrew.TTARCH2.Core.Analysis;
 using UCrew.TTARCH2.Core.Extraction;
 using UCrew.TTARCH2.Core.Import;
 using UCrew.TTARCH2.Core.Models;
+using UCrew.TTARCH2.Core.Rebuild;
 using UCrew.TTARCH2.Core.Reporting;
 
 if (args.Length == 0)
@@ -18,6 +19,8 @@ try
     string? dumpDirectory = null;
     string? landbTextPath = null;
     string? validateLandbTextPath = null;
+    string? importLandbTextPath = null;
+    string? importLandbOutputPath = null;
 
     for (int i = 1; i < args.Length; i++)
     {
@@ -37,6 +40,11 @@ try
 
             case "--validate-landb-text" when i + 1 < args.Length:
                 validateLandbTextPath = args[++i];
+                break;
+
+            case "--import-landb-text" when i + 2 < args.Length:
+                importLandbTextPath = args[++i];
+                importLandbOutputPath = args[++i];
                 break;
 
             default:
@@ -74,6 +82,13 @@ try
     if (!string.IsNullOrWhiteSpace(validateLandbTextPath))
         validation = await new LandbTextImportService().ValidateAsync(archive, validateLandbTextPath);
 
+    LandbTextImportResult? importResult = null;
+    if (!string.IsNullOrWhiteSpace(importLandbTextPath) && !string.IsNullOrWhiteSpace(importLandbOutputPath))
+    {
+        importResult = await new LandbFixedSizeImportService()
+            .ImportToCopyAsync(archive, importLandbTextPath, importLandbOutputPath);
+    }
+
     Console.WriteLine($"File       : {archive.FileName}");
     Console.WriteLine($"Size       : {archive.FileSize:n0} bytes");
     Console.WriteLine($"Magic      : {archive.Header.Magic}");
@@ -108,7 +123,22 @@ try
             Console.WriteLine($"WARNING: {warning}");
     }
 
-    if (validation is { Success: false })
+    if (importResult is not null)
+    {
+        Console.WriteLine($"LANDb Import: {(importResult.Success ? "PASS" : "FAIL")}");
+        Console.WriteLine($"Import Lines: {importResult.ActualLineCount:n0} / {importResult.ExpectedLineCount:n0}");
+
+        foreach (string error in importResult.Errors)
+            Console.Error.WriteLine($"ERROR: {error}");
+
+        foreach (string warning in importResult.Warnings)
+            Console.WriteLine($"WARNING: {warning}");
+
+        if (importResult.Success && importLandbOutputPath is not null)
+            Console.WriteLine($"Output LANDb: {Path.GetFullPath(importLandbOutputPath)}");
+    }
+
+    if (validation is { Success: false } || importResult is { Success: false })
         return 4;
 
     return archive.Validation.Success ? 0 : 2;
@@ -122,5 +152,5 @@ catch (Exception ex)
 static void PrintUsage()
 {
     Console.WriteLine("Usage:");
-    Console.WriteLine("  UCrew.TTARCH2.CLI <archive-path> [--report <json-path>] [--dump-chunks <directory>] [--export-landb-text <txt-path>] [--validate-landb-text <translated-txt-path>]");
+    Console.WriteLine("  UCrew.TTARCH2.CLI <archive-path> [--report <json-path>] [--dump-chunks <directory>] [--export-landb-text <txt-path>] [--validate-landb-text <translated-txt-path>] [--import-landb-text <translated-txt-path> <output-landb-path>]");
 }
