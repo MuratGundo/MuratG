@@ -78,7 +78,9 @@ public partial class MainWindow : Window
     {
         IsEnabled = !isBusy;
         StatusText.Text = message;
-        Mouse.OverrideCursor = isBusy ? System.Windows.Input.Cursors.Wait : null;
+        System.Windows.Input.Mouse.OverrideCursor = isBusy
+            ? System.Windows.Input.Cursors.Wait
+            : null;
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e)
