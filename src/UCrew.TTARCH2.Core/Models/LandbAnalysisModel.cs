@@ -9,4 +9,6 @@ public sealed class LandbAnalysisModel
     public string Notes { get; set; } = string.Empty;
 
     public List<LandbTextCandidate> TextCandidates { get; } = new();
+
+    public List<LandbLengthFieldCandidate> LengthFieldCandidates { get; } = new();
 }
