@@ -18,5 +18,7 @@ public sealed class ArchiveModel
 
     public List<RegionModel> Regions { get; } = new();
 
+    public List<ECTTChunkInfo> ECTTChunks { get; } = new();
+
     public ValidationResult Validation { get; } = new();
 }
