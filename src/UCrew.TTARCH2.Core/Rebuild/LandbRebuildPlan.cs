@@ -34,4 +34,19 @@ public sealed class LandbRebuildEntry
     public string Text { get; init; } = string.Empty;
 
     public List<long> PointerSourceOffsets { get; } = new();
+
+    public List<LandbRebuildLengthField> LengthFields { get; } = new();
+}
+
+public sealed class LandbRebuildLengthField
+{
+    public long FieldOffset { get; init; }
+
+    public int FieldSize { get; init; }
+
+    public long OriginalValue { get; init; }
+
+    public long NewValue { get; init; }
+
+    public double Confidence { get; init; }
 }
