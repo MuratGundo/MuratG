@@ -20,7 +20,8 @@ public sealed class ArchiveAnalysisService
             .Register(new LandbAnalyzer())
             .Register(new LandbLengthFieldAnalyzer())
             .Register(new RegionDetector())
-            .Register(new ArchiveResourceCatalogAnalyzer());
+            .Register(new ArchiveResourceCatalogAnalyzer())
+            .Register(new ArchiveTableFieldAnalyzer());
 
         await pipeline.ExecuteAsync(analysisContext, token).ConfigureAwait(false);
         return archive;
