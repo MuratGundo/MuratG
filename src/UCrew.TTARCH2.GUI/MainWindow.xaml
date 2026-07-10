@@ -12,6 +12,7 @@
                 <MenuItem Header="_JSON Raporunu Kaydet..." Click="SaveReport_Click" />
                 <MenuItem Header="_Chunkları Dışarı Çıkar..." Click="DumpChunks_Click" />
                 <MenuItem Header="_Seçili Chunkı Kaydet..." Click="ExportSelectedChunk_Click" />
+                <MenuItem Header="_Düzenlenmiş Metni Kaydet..." Click="SaveEditedText_Click" />
                 <Separator />
                 <MenuItem Header="Çı_kış" Click="Exit_Click" />
             </MenuItem>
@@ -60,7 +61,7 @@
                 </Grid>
             </Border>
 
-            <TabControl Grid.Row="1">
+            <TabControl Grid.Row="1" x:Name="MainTabs">
                 <TabItem Header="Chunklar">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -98,6 +99,26 @@
                                  IsReadOnly="True" AcceptsReturn="True" AcceptsTab="True"
                                  HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
                                  TextWrapping="NoWrap" />
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="Metin" x:Name="TextTab">
+                    <Grid Margin="6">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <DockPanel Grid.Row="0" Margin="0,0,0,6">
+                            <Button DockPanel.Dock="Right" Content="Metni Ayrı Kaydet" Padding="12,5"
+                                    Click="SaveEditedText_Click" />
+                            <TextBlock x:Name="TextPreviewInfo" VerticalAlignment="Center"
+                                       Text="Metin türünde bir chunk seçilmedi." />
+                        </DockPanel>
+                        <TextBox Grid.Row="1" x:Name="TextEditor"
+                                 FontFamily="Consolas" FontSize="13"
+                                 AcceptsReturn="True" AcceptsTab="True"
+                                 HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                                 TextWrapping="NoWrap" IsEnabled="False" />
                     </Grid>
                 </TabItem>
 
