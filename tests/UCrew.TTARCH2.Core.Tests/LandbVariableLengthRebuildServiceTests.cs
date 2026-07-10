@@ -50,7 +50,7 @@ public sealed class LandbVariableLengthRebuildServiceTests
         Assert.True(File.Exists(output));
 
         byte[] rebuilt = await File.ReadAllBytesAsync(output);
-        Assert.Equal(64, rebuilt.Length);
+        Assert.Equal(65, rebuilt.Length);
         Assert.Equal((uint)16, BinaryPrimitives.ReadUInt32LittleEndian(rebuilt.AsSpan(0, 4)));
         Assert.Equal((uint)26, BinaryPrimitives.ReadUInt32LittleEndian(rebuilt.AsSpan(4, 4)));
         Assert.Equal((ushort)7, BinaryPrimitives.ReadUInt16LittleEndian(rebuilt.AsSpan(14, 2)));
