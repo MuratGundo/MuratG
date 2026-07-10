@@ -63,6 +63,8 @@ public sealed class ArchiveResourceCatalogAnalyzer : IAnalyzer
 
     private static bool StartsWithAscii(ReadOnlySpan<byte> data, string value)
     {
-        return data.StartsWith(Encoding.ASCII.GetBytes(value));
+        byte[] expected = Encoding.ASCII.GetBytes(value);
+        return data.Length >= expected.Length
+            && data[..expected.Length].SequenceEqual(expected);
     }
 }
