@@ -22,7 +22,8 @@ public partial class MainWindow
         ResourceSummaryText.Text =
             $"Toplam {_currentArchive.Resources.Count:N0} kaynak | " +
             $"LANDb adayı {landbCount:N0} | " +
-            $"Tablo alanı {_currentArchive.TableFields.Count:N0}";
+            $"Tablo alanı {_currentArchive.TableFields.Count:N0} | " +
+            $"Sıkıştırma adayı {_currentArchive.CompressionBlocks.Count:N0}";
     }
 
     private async void ExtractSelectedResource_Click(object sender, RoutedEventArgs e)
@@ -83,6 +84,25 @@ public partial class MainWindow
         if (replacementDialog.ShowDialog(this) != true)
             return;
 
+        long replacementSize = new FileInfo(replacementDialog.FileName).Length;
+        long delta = replacementSize - resource.Size;
+
+        List<string> safetyErrors = new ArchiveRebuildSafetyValidator()
+            .ValidateVariableSizeReplacement(_currentArchive, resource, replacementSize);
+
+        if (safetyErrors.Count > 0)
+        {
+            MessageBox.Show(
+                this,
+                "TTARCH2 rebuild güvenlik kontrolünden geçmedi. Dosya oluşturulmayacak.\n\n" +
+                string.Join(Environment.NewLine, safetyErrors),
+                "TTARCH2 Rebuild Engellendi",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            StatusText.Text = $"TTARCH2 rebuild engellendi: {safetyErrors.Count:N0} güvenlik sorunu.";
+            return;
+        }
+
         SaveFileDialog outputDialog = new()
         {
             Title = "Yeni TTARCH2 kopyasını kaydet",
@@ -94,9 +114,6 @@ public partial class MainWindow
 
         if (outputDialog.ShowDialog(this) != true)
             return;
-
-        long replacementSize = new FileInfo(replacementDialog.FileName).Length;
-        long delta = replacementSize - resource.Size;
 
         MessageBoxResult confirmation = MessageBox.Show(
             this,
