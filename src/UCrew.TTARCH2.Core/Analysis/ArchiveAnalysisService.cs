@@ -1,3 +1,4 @@
+using UCrew.TTARCH2.Core.Compatibility;
 using UCrew.TTARCH2.Core.Models;
 
 namespace UCrew.TTARCH2.Core.Analysis;
@@ -25,6 +26,32 @@ public sealed class ArchiveAnalysisService
             .Register(new ArchiveCompressionBlockAnalyzer());
 
         await pipeline.ExecuteAsync(analysisContext, token).ConfigureAwait(false);
+
+        bool isEcttTtarch2 = Path.GetExtension(archive.FullPath)
+            .Equals(".ttarch2", StringComparison.OrdinalIgnoreCase)
+            && archive.Header.Magic.Equals("ECTT", StringComparison.OrdinalIgnoreCase);
+
+        if (isEcttTtarch2)
+        {
+            TtarchextBackendResult backend = await new TtarchextBackendService()
+                .ExtractGuardiansArchiveAsync(archive.FullPath, token)
+                .ConfigureAwait(false);
+
+            if (backend.Success)
+            {
+                archive.Resources.Clear();
+                archive.Resources.AddRange(backend.Resources);
+            }
+            else
+            {
+                foreach (string error in backend.Errors)
+                    archive.Validation.Warnings.Add(error);
+            }
+
+            foreach (string warning in backend.Warnings)
+                archive.Validation.Warnings.Add(warning);
+        }
+
         return archive;
     }
 }
