@@ -6,6 +6,8 @@ namespace UCrew.TTARCH2.Core.Rebuild;
 
 public sealed class LandbVariableLengthPlanner
 {
+    public double MinimumLengthFieldConfidence { get; init; } = 0.90;
+
     public async Task<LandbRebuildPlan> CreatePlanAsync(
         ArchiveModel archive,
         string translatedTextPath,
@@ -52,10 +54,29 @@ public sealed class LandbVariableLengthPlanner
             foreach (PointerHit pointer in archive.Pointers.Where(x => x.TargetOffset == candidate.Offset))
                 entry.PointerSourceOffsets.Add(pointer.SourceOffset);
 
+            foreach (LandbLengthFieldCandidate field in archive.Landb.LengthFieldCandidates
+                         .Where(x => x.TextIndex == i && x.Confidence >= MinimumLengthFieldConfidence))
+            {
+                entry.LengthFields.Add(new LandbRebuildLengthField
+                {
+                    FieldOffset = field.FieldOffset,
+                    FieldSize = field.FieldSize,
+                    OriginalValue = field.StoredValue,
+                    NewValue = newLength,
+                    Confidence = field.Confidence
+                });
+            }
+
             if (entry.Delta != 0 && entry.PointerSourceOffsets.Count == 0)
             {
                 plan.Errors.Add(
                     $"Line {i + 1:N0} changes size, but no pointer referencing text offset 0x{candidate.Offset:X} was identified.");
+            }
+
+            if (entry.Delta != 0 && entry.LengthFields.Count == 0)
+            {
+                plan.Errors.Add(
+                    $"Line {i + 1:N0} changes size, but no high-confidence length field was identified.");
             }
 
             plan.Entries.Add(entry);
@@ -64,10 +85,10 @@ public sealed class LandbVariableLengthPlanner
 
         plan.PlannedFileSize = archive.FileSize + accumulatedDelta;
 
-        if (plan.Entries.Any(x => x.Delta != 0))
+        if (plan.Entries.Any(x => x.Delta != 0) && plan.CanRebuild)
         {
             plan.Warnings.Add(
-                "Variable-length rebuilding remains blocked until all LANDb pointer and length fields are confirmed for this game format.");
+                "Dry-run passed for detected pointer and length fields. Binary output still requires post-build structural verification.");
         }
 
         return plan;
