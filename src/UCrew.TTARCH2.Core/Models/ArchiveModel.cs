@@ -24,5 +24,7 @@ public sealed class ArchiveModel
 
     public List<ChunkModel> Chunks { get; } = new();
 
+    public List<ArchiveResourceEntry> Resources { get; } = new();
+
     public ValidationResult Validation { get; } = new();
 }
