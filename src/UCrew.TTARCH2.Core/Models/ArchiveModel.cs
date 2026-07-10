@@ -12,6 +12,8 @@ public sealed class ArchiveModel
 
     public EcttAnalysisModel Ectt { get; set; } = new();
 
+    public LandbAnalysisModel Landb { get; set; } = new();
+
     public List<EntropyPoint> EntropyMap { get; } = new();
 
     public List<PointerHit> Pointers { get; } = new();
