@@ -25,6 +25,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        RefreshResourceCatalog();
     }
 
     private async void OpenArchive_Click(object sender, RoutedEventArgs e)
@@ -403,6 +404,7 @@ public partial class MainWindow : Window
         SignaturesGrid.ItemsSource = archive.Signatures;
         ClearChunkPreview();
         ApplyLandbFilter();
+        RefreshResourceCatalog();
     }
 
     private void ClearChunkPreview()
