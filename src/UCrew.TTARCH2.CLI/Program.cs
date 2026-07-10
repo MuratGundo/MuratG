@@ -1,17 +1,39 @@
 using UCrew.TTARCH2.Core;
 using UCrew.TTARCH2.Core.Analysis;
+using UCrew.TTARCH2.Core.Extraction;
 using UCrew.TTARCH2.Core.Models;
 using UCrew.TTARCH2.Core.Reporting;
 
 if (args.Length == 0)
 {
-    Console.WriteLine("Usage: UCrew.TTARCH2.CLI <archive-path> [report-json-path]");
+    PrintUsage();
     return 1;
 }
 
 try
 {
-    ArchiveModel archive = ArchiveLoader.Open(args[0]);
+    string archivePath = args[0];
+    string? reportPath = null;
+    string? dumpDirectory = null;
+
+    for (int i = 1; i < args.Length; i++)
+    {
+        switch (args[i])
+        {
+            case "--report" when i + 1 < args.Length:
+                reportPath = args[++i];
+                break;
+
+            case "--dump-chunks" when i + 1 < args.Length:
+                dumpDirectory = args[++i];
+                break;
+
+            default:
+                throw new ArgumentException($"Unknown or incomplete argument: {args[i]}");
+        }
+    }
+
+    ArchiveModel archive = ArchiveLoader.Open(archivePath);
 
     using ArchiveContext archiveContext = new(archive.FullPath);
     AnalysisContext analysisContext = new(archiveContext, archive);
@@ -26,11 +48,14 @@ try
 
     await pipeline.ExecuteAsync(analysisContext);
 
-    string reportPath = args.Length >= 2
-        ? args[1]
-        : Path.ChangeExtension(archive.FullPath, ".analysis.json");
-
+    reportPath ??= Path.ChangeExtension(archive.FullPath, ".analysis.json");
     await new JsonReportWriter().WriteAsync(archive, reportPath);
+
+    int dumpedChunks = 0;
+    if (!string.IsNullOrWhiteSpace(dumpDirectory))
+    {
+        dumpedChunks = await new ChunkDumpService().DumpAsync(archive, dumpDirectory);
+    }
 
     Console.WriteLine($"File       : {archive.FileName}");
     Console.WriteLine($"Size       : {archive.FileSize:n0} bytes");
@@ -46,10 +71,19 @@ try
     Console.WriteLine($"Regions    : {archive.Regions.Count:n0} candidates");
     Console.WriteLine($"Report     : {reportPath}");
 
+    if (dumpDirectory is not null)
+        Console.WriteLine($"Dumped     : {dumpedChunks:n0} chunks -> {Path.GetFullPath(dumpDirectory)}");
+
     return archive.Validation.Success ? 0 : 2;
 }
 catch (Exception ex)
 {
     Console.Error.WriteLine(ex.Message);
     return 3;
+}
+
+static void PrintUsage()
+{
+    Console.WriteLine("Usage:");
+    Console.WriteLine("  UCrew.TTARCH2.CLI <archive-path> [--report <json-path>] [--dump-chunks <directory>]");
 }
