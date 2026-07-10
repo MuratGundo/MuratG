@@ -17,4 +17,10 @@ public sealed class ArchiveResourceEntry
     public double Confidence { get; init; }
 
     public string Source { get; init; } = string.Empty;
+
+    public string ExtractedPath { get; init; } = string.Empty;
+
+    public string RelativePath { get; init; } = string.Empty;
+
+    public bool IsExtracted => !string.IsNullOrWhiteSpace(ExtractedPath) && File.Exists(ExtractedPath);
 }
