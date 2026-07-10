@@ -350,11 +350,17 @@ public partial class MainWindow : Window
 
     private void LandbFilter_Changed(object sender, EventArgs e)
     {
+        if (!IsLoaded || _currentArchive is null)
+            return;
+
         ApplyLandbFilter();
     }
 
     private void ApplyLandbFilter()
     {
+        if (LandbCandidatesGrid is null || LandbSummaryText is null)
+            return;
+
         if (_currentArchive is null)
         {
             LandbCandidatesGrid.ItemsSource = null;
