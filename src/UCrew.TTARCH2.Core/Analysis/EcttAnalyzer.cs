@@ -30,13 +30,15 @@ public sealed class EcttAnalyzer : IAnalyzer
             return Task.CompletedTask;
         }
 
+        bool endsAtEof = offsets[^1] == model.FileSize;
+
         model.Ectt.LooksLikeEctt = true;
         model.Ectt.OffsetTableStart = 0x10;
         model.Ectt.OffsetTableEnd = 0x10 + offsets.Count * 8;
         model.Ectt.OffsetEntryCount = offsets.Count;
         model.Ectt.ChunkCount = offsets.Count - 1;
-        model.Ectt.Confidence = offsets[^1] == model.FileSize ? 0.95 : 0.70;
-        model.Ectt.Notes = offsets[^1] == model.FileSize
+        model.Ectt.Confidence = endsAtEof ? 0.95 : 0.70;
+        model.Ectt.Notes = endsAtEof
             ? "Detected monotonic ECTT-style offset table ending at EOF."
             : "Detected monotonic ECTT-style offset table, but last entry is not EOF.";
 
@@ -45,7 +47,7 @@ public sealed class EcttAnalyzer : IAnalyzer
             long start = offsets[i];
             long end = offsets[i + 1];
 
-            if (end <= start)
+            if (start < 0 || end <= start || end > model.FileSize)
                 continue;
 
             model.Chunks.Add(new ChunkModel
@@ -66,20 +68,22 @@ public sealed class EcttAnalyzer : IAnalyzer
     {
         List<long> offsets = new();
 
+        if (reader.Length < 0x18)
+            return offsets;
+
         reader.Seek(0x10);
 
         while (reader.Remaining >= 8)
         {
             token.ThrowIfCancellationRequested();
 
-            long entryOffset = reader.Position;
             uint reserved = reader.ReadUInt32();
             uint value = reader.ReadUInt32();
 
-            if (reserved != 0)
+            if (reserved != 0 || value == 0)
                 break;
 
-            if (value == 0)
+            if (value > reader.Length)
                 break;
 
             if (offsets.Count > 0 && value <= offsets[^1])
@@ -87,10 +91,7 @@ public sealed class EcttAnalyzer : IAnalyzer
 
             offsets.Add(value);
 
-            if (offsets.Count > 4096)
-                break;
-
-            if (entryOffset > 0x20000 && offsets.Count < 4)
+            if (value == reader.Length || offsets.Count >= 4096)
                 break;
         }
 
