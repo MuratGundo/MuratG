@@ -8,8 +8,6 @@ public sealed class ArchiveTableFieldAnalyzer : IAnalyzer
 
     public int Priority => 320;
 
-    public int SearchWindow { get; init; } = 64;
-
     public Task AnalyzeAsync(AnalysisContext context, CancellationToken token)
     {
         ArchiveModel model = context.Model;
@@ -20,7 +18,7 @@ public sealed class ArchiveTableFieldAnalyzer : IAnalyzer
         {
             token.ThrowIfCancellationRequested();
 
-            long searchEnd = Math.Min(model.FileSize, Math.Max(0, model.Header.HeaderSize));
+            long searchEnd = Math.Min(model.FileSize, Math.Max(0, model.Header.HeaderLength));
             if (searchEnd <= 0)
                 searchEnd = Math.Min(model.FileSize, 1024 * 1024);
 
@@ -40,7 +38,7 @@ public sealed class ArchiveTableFieldAnalyzer : IAnalyzer
         long searchEnd,
         CancellationToken token)
     {
-        if (expectedValue < 0)
+        if (expectedValue < 0 || expectedValue > uint.MaxValue)
             return;
 
         for (long offset = 0; offset + 4 <= searchEnd; offset += 4)
