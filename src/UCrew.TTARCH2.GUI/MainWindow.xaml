@@ -1,0 +1,113 @@
+<Window x:Class="UCrew.TTARCH2.GUI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="UCrew TTARCH2 Studio" Height="760" Width="1180"
+        MinHeight="600" MinWidth="900"
+        WindowStartupLocation="CenterScreen">
+    <DockPanel>
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_Dosya">
+                <MenuItem Header="_Arşiv Aç..." Click="OpenArchive_Click" />
+                <Separator />
+                <MenuItem Header="Çı_kış" Click="Exit_Click" />
+            </MenuItem>
+        </Menu>
+
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock x:Name="StatusText" Text="Hazır" />
+            </StatusBarItem>
+        </StatusBar>
+
+        <Grid Margin="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" BorderBrush="#D0D0D0" BorderThickness="1" Padding="12" Margin="0,0,0,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Dosya:" FontWeight="SemiBold" Margin="0,0,8,6" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" x:Name="FileNameText" Text="-" Margin="0,0,24,6" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Row="0" Grid.Column="2" Text="Boyut:" FontWeight="SemiBold" Margin="0,0,8,6" />
+                    <TextBlock Grid.Row="0" Grid.Column="3" x:Name="FileSizeText" Text="-" Margin="0,0,24,6" />
+                    <TextBlock Grid.Row="0" Grid.Column="4" Text="Magic:" FontWeight="SemiBold" Margin="0,0,8,6" />
+                    <TextBlock Grid.Row="0" Grid.Column="5" x:Name="MagicText" Text="-" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="ECTT:" FontWeight="SemiBold" Margin="0,0,8,0" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="EcttText" Text="-" Margin="0,0,24,0" />
+                    <TextBlock Grid.Row="1" Grid.Column="2" Text="Chunk:" FontWeight="SemiBold" Margin="0,0,8,0" />
+                    <TextBlock Grid.Row="1" Grid.Column="3" x:Name="ChunkCountText" Text="-" Margin="0,0,24,0" />
+                    <TextBlock Grid.Row="1" Grid.Column="4" Text="İmza:" FontWeight="SemiBold" Margin="0,0,8,0" />
+                    <TextBlock Grid.Row="1" Grid.Column="5" x:Name="SignatureCountText" Text="-" />
+                </Grid>
+            </Border>
+
+            <TabControl Grid.Row="1">
+                <TabItem Header="Chunklar">
+                    <DataGrid x:Name="ChunksGrid" IsReadOnly="True" AutoGenerateColumns="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="#" Binding="{Binding Index}" Width="70" />
+                            <DataGridTextColumn Header="Başlangıç" Binding="{Binding Offset, StringFormat=0x{0:X}}" Width="140" />
+                            <DataGridTextColumn Header="Bitiş" Binding="{Binding EndOffset, StringFormat=0x{0:X}}" Width="140" />
+                            <DataGridTextColumn Header="Boyut" Binding="{Binding Length, StringFormat={}{0:N0}}" Width="130" />
+                            <DataGridTextColumn Header="Entropi" Binding="{Binding Entropy, StringFormat={}{0:0.000}}" Width="100" />
+                            <DataGridTextColumn Header="Kaynak" Binding="{Binding Source}" Width="*" />
+                            <DataGridTextColumn Header="Güven" Binding="{Binding Confidence, StringFormat={}{0:0.00}}" Width="90" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </TabItem>
+
+                <TabItem Header="Header">
+                    <Grid Margin="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="Field0004" FontWeight="SemiBold" Margin="0,0,12,8" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="Field0004Text" Text="-" />
+                        <TextBlock Grid.Row="1" Text="Field0008" FontWeight="SemiBold" Margin="0,0,12,8" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="Field0008Text" Text="-" />
+                        <TextBlock Grid.Row="2" Text="Field000C" FontWeight="SemiBold" Margin="0,0,12,8" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="Field000CText" Text="-" />
+                        <TextBlock Grid.Row="3" Text="Offset tablo aralığı" FontWeight="SemiBold" Margin="0,0,12,8" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="OffsetTableText" Text="-" />
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="İmzalar">
+                    <DataGrid x:Name="SignaturesGrid" IsReadOnly="True" AutoGenerateColumns="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Ad" Binding="{Binding Name}" Width="180" />
+                            <DataGridTextColumn Header="Kategori" Binding="{Binding Category}" Width="180" />
+                            <DataGridTextColumn Header="Offset" Binding="{Binding Offset, StringFormat=0x{0:X}}" Width="140" />
+                            <DataGridTextColumn Header="Uzunluk" Binding="{Binding Length}" Width="100" />
+                            <DataGridTextColumn Header="Güven" Binding="{Binding Confidence, StringFormat={}{0:0.00}}" Width="100" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </DockPanel>
+</Window>
