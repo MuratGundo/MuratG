@@ -22,9 +22,7 @@
         </Menu>
 
         <StatusBar DockPanel.Dock="Bottom">
-            <StatusBarItem>
-                <TextBlock x:Name="StatusText" Text="Hazır" />
-            </StatusBarItem>
+            <StatusBarItem><TextBlock x:Name="StatusText" Text="Hazır" /></StatusBarItem>
         </StatusBar>
 
         <Grid Margin="12">
@@ -36,17 +34,11 @@
             <Border Grid.Row="0" BorderBrush="#D0D0D0" BorderThickness="1" Padding="12" Margin="0,0,0,12">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="220" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="220" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" /><ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="Auto" /><ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Dosya:" FontWeight="SemiBold" Margin="0,0,8,6" />
                     <TextBlock Grid.Row="0" Grid.Column="1" x:Name="FileNameText" Text="-" Margin="0,0,24,6" TextTrimming="CharacterEllipsis" />
                     <TextBlock Grid.Row="0" Grid.Column="2" Text="Boyut:" FontWeight="SemiBold" Margin="0,0,8,6" />
@@ -63,14 +55,35 @@
             </Border>
 
             <TabControl Grid.Row="1" x:Name="MainTabs">
+                <TabItem Header="Kaynaklar">
+                    <Grid Margin="6">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                        <DockPanel Grid.Row="0" Margin="0,0,0,6">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button Content="Seçili LANDb'yi Çıkar" Padding="12,5" Margin="0,0,6,0" Click="ExtractSelectedResource_Click" />
+                                <Button Content="LANDb ile Değiştir" Padding="12,5" Click="ReplaceSelectedResource_Click" />
+                            </StackPanel>
+                            <TextBlock x:Name="ResourceSummaryText" VerticalAlignment="Center" Text="Kaynak kataloğu yok." />
+                        </DockPanel>
+                        <DataGrid Grid.Row="1" x:Name="ResourcesGrid" IsReadOnly="True" AutoGenerateColumns="False"
+                                  CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="#" Binding="{Binding Index}" Width="70" />
+                                <DataGridTextColumn Header="Ad" Binding="{Binding Name}" Width="220" />
+                                <DataGridTextColumn Header="Tür" Binding="{Binding Extension}" Width="100" />
+                                <DataGridTextColumn Header="Offset" Binding="{Binding Offset, StringFormat={}{0:X8}}" Width="140" />
+                                <DataGridTextColumn Header="Boyut" Binding="{Binding Size, StringFormat={}{0:N0}}" Width="120" />
+                                <DataGridCheckBoxColumn Header="LANDb" Binding="{Binding IsLandb}" Width="80" />
+                                <DataGridTextColumn Header="Güven" Binding="{Binding Confidence, StringFormat={}{0:0.00}}" Width="90" />
+                                <DataGridTextColumn Header="Kaynak" Binding="{Binding Source}" Width="*" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+
                 <TabItem Header="Chunklar">
                     <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="2*" />
-                            <RowDefinition Height="6" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="2*" /><RowDefinition Height="6" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                         <DataGrid Grid.Row="0" x:Name="ChunksGrid" IsReadOnly="True" AutoGenerateColumns="False"
                                   CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single"
                                   SelectionChanged="ChunksGrid_SelectionChanged">
@@ -98,11 +111,7 @@
 
                 <TabItem Header="Metin" x:Name="TextTab">
                     <Grid Margin="6">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                         <DockPanel Grid.Row="0" Margin="0,0,0,6">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                 <Button Content="Metni Ayrı Kaydet" Padding="12,5" Margin="0,0,6,0" Click="SaveEditedText_Click" />
@@ -120,11 +129,7 @@
 
                 <TabItem Header="LANDb">
                     <Grid Margin="6">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                         <DockPanel Grid.Row="0" Margin="0,0,0,6">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                 <Button Content="Adayları TXT Olarak Kaydet" Padding="12,5" Margin="0,0,6,0" Click="ExportLandbCandidates_Click" />
@@ -137,10 +142,8 @@
                             <TextBox x:Name="LandbSearchText" Width="280" Margin="0,0,16,0" TextChanged="LandbFilter_Changed" />
                             <TextBlock Text="Minimum güven:" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <ComboBox x:Name="LandbConfidenceBox" Width="100" SelectedIndex="1" SelectionChanged="LandbFilter_Changed">
-                                <ComboBoxItem Content="0,00" Tag="0" />
-                                <ComboBoxItem Content="0,50" Tag="0.5" />
-                                <ComboBoxItem Content="0,65" Tag="0.65" />
-                                <ComboBoxItem Content="0,80" Tag="0.8" />
+                                <ComboBoxItem Content="0,00" Tag="0" /><ComboBoxItem Content="0,50" Tag="0.5" />
+                                <ComboBoxItem Content="0,65" Tag="0.65" /><ComboBoxItem Content="0,80" Tag="0.8" />
                             </ComboBox>
                             <CheckBox x:Name="LandbHideShortCheck" Content="4 karakterden kısaları gizle" Margin="16,0,0,0" IsChecked="True" Checked="LandbFilter_Changed" Unchecked="LandbFilter_Changed" />
                         </StackPanel>
