@@ -15,12 +15,34 @@ public sealed class ArchiveResourceExtractService
         ArgumentNullException.ThrowIfNull(archive);
         ArgumentNullException.ThrowIfNull(resource);
 
-        if (resource.Offset < 0 || resource.Size <= 0 || resource.Offset + resource.Size > archive.FileSize)
-            throw new InvalidDataException("Resource boundaries are invalid.");
-
         string? directory = Path.GetDirectoryName(Path.GetFullPath(outputPath));
         if (!string.IsNullOrWhiteSpace(directory))
             Directory.CreateDirectory(directory);
+
+        if (resource.IsExtracted)
+        {
+            await using FileStream extracted = new(
+                resource.ExtractedPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                BufferSize,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+
+            await using FileStream extractedOutput = new(
+                outputPath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None,
+                BufferSize,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+
+            await extracted.CopyToAsync(extractedOutput, BufferSize, token).ConfigureAwait(false);
+            return;
+        }
+
+        if (resource.Offset < 0 || resource.Size <= 0 || resource.Offset + resource.Size > archive.FileSize)
+            throw new InvalidDataException("Resource boundaries are invalid.");
 
         await using FileStream input = new(
             archive.FullPath,
