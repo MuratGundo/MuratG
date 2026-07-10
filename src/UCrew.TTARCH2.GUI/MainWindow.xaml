@@ -15,6 +15,7 @@
                 <MenuItem Header="_Düzenlenmiş Metni Kaydet..." Click="SaveEditedText_Click" />
                 <MenuItem Header="_Metni Arşiv Kopyasına Uygula..." Click="PatchTextToCopy_Click" />
                 <MenuItem Header="_LANDb Adaylarını Dışa Aktar..." Click="ExportLandbCandidates_Click" />
+                <MenuItem Header="LANDb TXT ile _Sınırsız Rebuild..." Click="RebuildLandbVariable_Click" />
                 <Separator />
                 <MenuItem Header="Çı_kış" Click="Exit_Click" />
             </MenuItem>
@@ -125,7 +126,10 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                            <Button DockPanel.Dock="Right" Content="Adayları TXT Olarak Kaydet" Padding="12,5" Click="ExportLandbCandidates_Click" />
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button Content="Adayları TXT Olarak Kaydet" Padding="12,5" Margin="0,0,6,0" Click="ExportLandbCandidates_Click" />
+                                <Button Content="TXT ile Sınırsız Rebuild" Padding="12,5" Click="RebuildLandbVariable_Click" />
+                            </StackPanel>
                             <TextBlock x:Name="LandbSummaryText" VerticalAlignment="Center" Text="LANDb analizi yok." />
                         </DockPanel>
                         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,6">
