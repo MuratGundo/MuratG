@@ -1,5 +1,6 @@
 using System.Windows;
 using Microsoft.Win32;
+using UCrew.TTARCH2.Core.Compatibility;
 using UCrew.TTARCH2.Core.Extraction;
 using UCrew.TTARCH2.Core.Models;
 using UCrew.TTARCH2.Core.Rebuild;
@@ -19,11 +20,11 @@ public partial class MainWindow
 
         ResourcesGrid.ItemsSource = _currentArchive.Resources;
         int landbCount = _currentArchive.Resources.Count(x => x.IsLandb);
+        int realCount = _currentArchive.Resources.Count(x => x.IsExtracted);
         ResourceSummaryText.Text =
             $"Toplam {_currentArchive.Resources.Count:N0} kaynak | " +
-            $"LANDb adayı {landbCount:N0} | " +
-            $"Tablo alanı {_currentArchive.TableFields.Count:N0} | " +
-            $"Sıkıştırma adayı {_currentArchive.CompressionBlocks.Count:N0}";
+            $"Gerçek ad {realCount:N0} | " +
+            $"LANDb {landbCount:N0}";
     }
 
     private async void ExtractSelectedResource_Click(object sender, RoutedEventArgs e)
@@ -40,7 +41,7 @@ public partial class MainWindow
             Filter = resource.IsLandb
                 ? "LANDb dosyası (*.landb)|*.landb|Tüm dosyalar (*.*)|*.*"
                 : "Tüm dosyalar (*.*)|*.*",
-            FileName = resource.Name,
+            FileName = Path.GetFileName(resource.Name),
             AddExtension = true,
             DefaultExt = resource.Extension
         };
@@ -73,6 +74,12 @@ public partial class MainWindow
             return;
         }
 
+        if (!resource.IsLandb)
+        {
+            MessageBox.Show(this, "Seçilen kaynak LANDb değil.", "LANDb Değiştir", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         OpenFileDialog replacementDialog = new()
         {
             Title = "Yeni LANDb dosyasını seç",
@@ -87,20 +94,23 @@ public partial class MainWindow
         long replacementSize = new FileInfo(replacementDialog.FileName).Length;
         long delta = replacementSize - resource.Size;
 
-        List<string> safetyErrors = new ArchiveRebuildSafetyValidator()
-            .ValidateVariableSizeReplacement(_currentArchive, resource, replacementSize);
-
-        if (safetyErrors.Count > 0)
+        if (!resource.IsExtracted)
         {
-            MessageBox.Show(
-                this,
-                "TTARCH2 rebuild güvenlik kontrolünden geçmedi. Dosya oluşturulmayacak.\n\n" +
-                string.Join(Environment.NewLine, safetyErrors),
-                "TTARCH2 Rebuild Engellendi",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            StatusText.Text = $"TTARCH2 rebuild engellendi: {safetyErrors.Count:N0} güvenlik sorunu.";
-            return;
+            List<string> safetyErrors = new ArchiveRebuildSafetyValidator()
+                .ValidateVariableSizeReplacement(_currentArchive, resource, replacementSize);
+
+            if (safetyErrors.Count > 0)
+            {
+                MessageBox.Show(
+                    this,
+                    "TTARCH2 rebuild güvenlik kontrolünden geçmedi. Dosya oluşturulmayacak.\n\n" +
+                    string.Join(Environment.NewLine, safetyErrors),
+                    "TTARCH2 Rebuild Engellendi",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                StatusText.Text = $"TTARCH2 rebuild engellendi: {safetyErrors.Count:N0} güvenlik sorunu.";
+                return;
+            }
         }
 
         SaveFileDialog outputDialog = new()
@@ -118,6 +128,7 @@ public partial class MainWindow
         MessageBoxResult confirmation = MessageBox.Show(
             this,
             $"Seçili LANDb yeni TTARCH2 kopyasına aktarılacak.\n\n" +
+            $"Dosya: {resource.RelativePath}\n" +
             $"Eski boyut: {resource.Size:N0} bayt\n" +
             $"Yeni boyut: {replacementSize:N0} bayt\n" +
             $"Fark: {delta:+#,0;-#,0;0} bayt\n\n" +
@@ -133,8 +144,13 @@ public partial class MainWindow
         {
             SetBusy(true, "LANDb içe aktarılıyor ve TTARCH2 yeniden oluşturuluyor...");
 
-            ArchiveVariableSizeReplacementResult result = await new ArchiveVariableSizeReplacementService()
-                .ReplaceToCopyAsync(
+            ArchiveVariableSizeReplacementResult result = resource.IsExtracted
+                ? await new RealTtarchReplacementService().ReplaceAndRebuildAsync(
+                    _currentArchive,
+                    resource,
+                    replacementDialog.FileName,
+                    outputDialog.FileName)
+                : await new ArchiveVariableSizeReplacementService().ReplaceToCopyAsync(
                     _currentArchive,
                     resource,
                     replacementDialog.FileName,
@@ -158,10 +174,7 @@ public partial class MainWindow
                 $"Yeni TTARCH2 oluşturuldu.\n\n" +
                 $"Çıktı: {result.OutputPath}\n" +
                 $"Boyut: {result.OutputFileSize:N0} bayt\n" +
-                $"Fark: {result.SizeDelta:+#,0;-#,0;0} bayt\n" +
-                $"Güncellenen size alanı: {result.UpdatedSizeFieldCount:N0}\n" +
-                $"Güncellenen offset alanı: {result.UpdatedOffsetFieldCount:N0}\n" +
-                $"Güncellenen ek pointer: {result.UpdatedPointerCount:N0}\n\n" +
+                $"Fark: {result.SizeDelta:+#,0;-#,0;0} bayt\n\n" +
                 "Orijinal TTARCH2 değiştirilmedi.",
                 "TTARCH2 Rebuild Tamamlandı",
                 MessageBoxButton.OK,
