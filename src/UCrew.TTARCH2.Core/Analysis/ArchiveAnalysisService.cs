@@ -17,6 +17,7 @@ public sealed class ArchiveAnalysisService
             .Register(new PointerScanner())
             .Register(new SignatureScanner())
             .Register(new EcttAnalyzer())
+            .Register(new LandbAnalyzer())
             .Register(new RegionDetector());
 
         await pipeline.ExecuteAsync(analysisContext, token).ConfigureAwait(false);
