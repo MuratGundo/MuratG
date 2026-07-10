@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Text;
 using System.Windows;
+using System.Windows.Controls;
 using Microsoft.Win32;
 using UCrew.TTARCH2.Core.Analysis;
 using UCrew.TTARCH2.Core.Extraction;
@@ -29,8 +31,8 @@ public partial class MainWindow : Window
     {
         OpenFileDialog dialog = new()
         {
-            Title = "TTARCH2 arşivi aç",
-            Filter = "TTARCH2 dosyaları (*.ttarch2)|*.ttarch2|Tüm dosyalar (*.*)|*.*",
+            Title = "TTARCH2 veya LANDb dosyası aç",
+            Filter = "Telltale dosyaları (*.ttarch2;*.landb)|*.ttarch2;*.landb|Tüm dosyalar (*.*)|*.*",
             CheckFileExists = true,
             Multiselect = false
         };
@@ -48,7 +50,7 @@ public partial class MainWindow : Window
             _currentArchive = archive;
             _selectedChunkType = null;
             DisplayArchive(archive);
-            StatusText.Text = $"Analiz tamamlandı: {archive.Chunks.Count:N0} chunk bulundu.";
+            StatusText.Text = $"Analiz tamamlandı: {archive.Chunks.Count:N0} chunk, {archive.Landb.TextCandidates.Count:N0} LANDb metin adayı.";
         }
         catch (Exception ex)
         {
@@ -67,7 +69,7 @@ public partial class MainWindow : Window
     {
         if (_currentArchive is null)
         {
-            MessageBox.Show(this, "Önce bir arşiv açmalısın.", "Rapor", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, "Önce bir dosya açmalısın.", "Rapor", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -215,12 +217,9 @@ public partial class MainWindow : Window
         int editedByteCount = Encoding.UTF8.GetByteCount(TextEditor.Text);
         if (editedByteCount != chunk.Length)
         {
-            MessageBox.Show(
-                this,
+            MessageBox.Show(this,
                 $"Geri yazma için UTF-8 bayt boyutu birebir aynı olmalı.\n\nChunk boyutu: {chunk.Length:N0} bayt\nDüzenlenmiş metin: {editedByteCount:N0} bayt",
-                "Boyut Uyuşmazlığı",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+                "Boyut Uyuşmazlığı", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -254,7 +253,46 @@ public partial class MainWindow : Window
         }
     }
 
-    private void TextEditor_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    private async void ExportLandbCandidates_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentArchive is null || _currentArchive.Landb.TextCandidates.Count == 0)
+        {
+            MessageBox.Show(this, "Dışa aktarılabilecek LANDb metin adayı bulunamadı.", "LANDb", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        SaveFileDialog dialog = new()
+        {
+            Title = "LANDb metin adaylarını kaydet",
+            Filter = "UTF-8 metin (*.txt)|*.txt",
+            FileName = Path.GetFileNameWithoutExtension(_currentArchive.FileName) + ".landb_candidates.txt",
+            AddExtension = true,
+            DefaultExt = ".txt"
+        };
+
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        try
+        {
+            SetBusy(true, "LANDb adayları dışa aktarılıyor...");
+            await new LandbTextExportService().ExportAsync(_currentArchive, dialog.FileName);
+            StatusText.Text = $"LANDb adayları kaydedildi: {dialog.FileName}";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "LANDb adayları kaydedilemedi.";
+            MessageBox.Show(this, ex.Message, "LANDb Dışa Aktarma Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            SetBusy(false, StatusText.Text);
+        }
+    }
+
+    private void TextEditor_TextChanged(object sender, TextChangedEventArgs e) => UpdateTextByteCount();
+
+    private void UpdateTextByteCount()
     {
         if (ChunksGrid.SelectedItem is not ChunkModel chunk || !TextEditor.IsEnabled)
         {
@@ -267,7 +305,7 @@ public partial class MainWindow : Window
         TextByteCountInfo.Text = $"UTF-8 boyutu: {bytes:N0} / {chunk.Length:N0} bayt — {state}";
     }
 
-    private async void ChunksGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    private async void ChunksGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_currentArchive is null || ChunksGrid.SelectedItem is not ChunkModel chunk)
         {
@@ -298,7 +336,7 @@ public partial class MainWindow : Window
                     ? "Chunk 256 KB sınırını aştığı için güvenli düzenleme devre dışı."
                     : "Seçili chunk metin olarak algılanmadı.";
 
-            TextEditor_TextChanged(TextEditor, new System.Windows.Controls.TextChangedEventArgs(System.Windows.Controls.TextBox.TextChangedEvent, UndoAction.None));
+            UpdateTextByteCount();
             StatusText.Text = $"Chunk {chunk.Index} önizlemesi hazır.";
         }
         catch (Exception ex)
@@ -307,6 +345,44 @@ public partial class MainWindow : Window
             HexPreviewText.Text = $"Önizleme hatası: {ex.Message}";
             StatusText.Text = "Chunk önizleme başarısız.";
         }
+    }
+
+    private void LandbFilter_Changed(object sender, EventArgs e)
+    {
+        ApplyLandbFilter();
+    }
+
+    private void ApplyLandbFilter()
+    {
+        if (_currentArchive is null)
+        {
+            LandbCandidatesGrid.ItemsSource = null;
+            LandbSummaryText.Text = "LANDb analizi yok.";
+            return;
+        }
+
+        string search = LandbSearchText?.Text?.Trim() ?? string.Empty;
+        double minimumConfidence = 0.5;
+
+        if (LandbConfidenceBox?.SelectedItem is ComboBoxItem item
+            && double.TryParse(Convert.ToString(item.Tag, CultureInfo.InvariantCulture), NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed))
+        {
+            minimumConfidence = parsed;
+        }
+
+        bool hideShort = LandbHideShortCheck?.IsChecked == true;
+
+        List<LandbTextCandidate> filtered = _currentArchive.Landb.TextCandidates
+            .Where(x => x.Confidence >= minimumConfidence)
+            .Where(x => !hideShort || x.Text.Trim().Length >= 4)
+            .Where(x => string.IsNullOrEmpty(search) || x.Text.Contains(search, StringComparison.CurrentCultureIgnoreCase))
+            .OrderBy(x => x.Offset)
+            .ToList();
+
+        LandbCandidatesGrid.ItemsSource = filtered;
+        LandbSummaryText.Text = _currentArchive.Landb.LooksLikeLandb
+            ? $"LANDb: evet | güven {_currentArchive.Landb.Confidence:0.00} | gösterilen {filtered.Count:N0} / toplam {_currentArchive.Landb.TextCandidates.Count:N0}"
+            : $"LANDb doğrulanmadı | gösterilen {filtered.Count:N0} aday";
     }
 
     private void DisplayArchive(ArchiveModel archive)
@@ -326,6 +402,7 @@ public partial class MainWindow : Window
         ChunksGrid.ItemsSource = archive.Chunks;
         SignaturesGrid.ItemsSource = archive.Signatures;
         ClearChunkPreview();
+        ApplyLandbFilter();
     }
 
     private void ClearChunkPreview()
