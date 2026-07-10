@@ -19,7 +19,10 @@ public partial class MainWindow
 
         ResourcesGrid.ItemsSource = _currentArchive.Resources;
         int landbCount = _currentArchive.Resources.Count(x => x.IsLandb);
-        ResourceSummaryText.Text = $"Toplam {_currentArchive.Resources.Count:N0} kaynak | LANDb adayı {landbCount:N0}";
+        ResourceSummaryText.Text =
+            $"Toplam {_currentArchive.Resources.Count:N0} kaynak | " +
+            $"LANDb adayı {landbCount:N0} | " +
+            $"Tablo alanı {_currentArchive.TableFields.Count:N0}";
     }
 
     private async void ExtractSelectedResource_Click(object sender, RoutedEventArgs e)
@@ -139,7 +142,9 @@ public partial class MainWindow
                 $"Çıktı: {result.OutputPath}\n" +
                 $"Boyut: {result.OutputFileSize:N0} bayt\n" +
                 $"Fark: {result.SizeDelta:+#,0;-#,0;0} bayt\n" +
-                $"Güncellenen pointer: {result.UpdatedPointerCount:N0}\n\n" +
+                $"Güncellenen size alanı: {result.UpdatedSizeFieldCount:N0}\n" +
+                $"Güncellenen offset alanı: {result.UpdatedOffsetFieldCount:N0}\n" +
+                $"Güncellenen ek pointer: {result.UpdatedPointerCount:N0}\n\n" +
                 "Orijinal TTARCH2 değiştirilmedi.",
                 "TTARCH2 Rebuild Tamamlandı",
                 MessageBoxButton.OK,
