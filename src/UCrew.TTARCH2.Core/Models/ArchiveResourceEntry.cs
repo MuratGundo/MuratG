@@ -20,6 +20,8 @@ public sealed class ArchiveResourceEntry
 
     public string ExtractedPath { get; init; } = string.Empty;
 
+    public string ExtractionRoot { get; init; } = string.Empty;
+
     public string RelativePath { get; init; } = string.Empty;
 
     public bool IsExtracted => !string.IsNullOrWhiteSpace(ExtractedPath) && File.Exists(ExtractedPath);
