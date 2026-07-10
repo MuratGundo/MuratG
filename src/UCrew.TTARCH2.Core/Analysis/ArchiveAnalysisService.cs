@@ -6,9 +6,9 @@ public sealed class ArchiveAnalysisService
 {
     public async Task<ArchiveModel> AnalyzeAsync(string filePath, CancellationToken token = default)
     {
-        ArchiveModel archive = ArchiveLoader.Open(filePath);
+        ArchiveModel archive = UCrew.TTARCH2.Core.ArchiveLoader.Open(filePath);
 
-        using ArchiveContext archiveContext = new(archive.FullPath);
+        using UCrew.TTARCH2.Core.ArchiveContext archiveContext = new(archive.FullPath);
         AnalysisContext analysisContext = new(archiveContext, archive);
 
         AnalyzerPipeline pipeline = new AnalyzerPipeline()
