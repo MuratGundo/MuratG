@@ -73,7 +73,7 @@
                                 <DataGridTextColumn Header="Tür" Binding="{Binding Extension}" Width="100" />
                                 <DataGridTextColumn Header="Offset" Binding="{Binding Offset, StringFormat={}{0:X8}}" Width="140" />
                                 <DataGridTextColumn Header="Boyut" Binding="{Binding Size, StringFormat={}{0:N0}}" Width="120" />
-                                <DataGridCheckBoxColumn Header="LANDb" Binding="{Binding IsLandb}" Width="80" />
+                                <DataGridCheckBoxColumn Header="LANDb" Binding="{Binding IsLandb, Mode=OneWay}" Width="80" IsReadOnly="True" />
                                 <DataGridTextColumn Header="Güven" Binding="{Binding Confidence, StringFormat={}{0:0.00}}" Width="90" />
                                 <DataGridTextColumn Header="Kaynak" Binding="{Binding Source}" Width="*" />
                             </DataGrid.Columns>
