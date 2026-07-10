@@ -3,6 +3,7 @@ using Microsoft.Win32;
 using UCrew.TTARCH2.Core.Analysis;
 using UCrew.TTARCH2.Core.Extraction;
 using UCrew.TTARCH2.Core.Models;
+using UCrew.TTARCH2.Core.Preview;
 using UCrew.TTARCH2.Core.Reporting;
 
 namespace UCrew.TTARCH2.GUI;
@@ -10,6 +11,7 @@ namespace UCrew.TTARCH2.GUI;
 public partial class MainWindow : Window
 {
     private readonly ArchiveAnalysisService _analysisService = new();
+    private readonly HexPreviewService _hexPreviewService = new();
     private ArchiveModel? _currentArchive;
 
     public MainWindow()
@@ -134,6 +136,27 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void ChunksGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_currentArchive is null || ChunksGrid.SelectedItem is not ChunkModel chunk)
+        {
+            HexPreviewText.Clear();
+            return;
+        }
+
+        try
+        {
+            StatusText.Text = $"Chunk {chunk.Index} önizleniyor...";
+            HexPreviewText.Text = await _hexPreviewService.CreateChunkPreviewAsync(_currentArchive, chunk);
+            StatusText.Text = $"Chunk {chunk.Index} önizlemesi hazır.";
+        }
+        catch (Exception ex)
+        {
+            HexPreviewText.Text = $"Önizleme hatası: {ex.Message}";
+            StatusText.Text = "Chunk önizleme başarısız.";
+        }
+    }
+
     private void DisplayArchive(ArchiveModel archive)
     {
         FileNameText.Text = archive.FileName;
@@ -154,6 +177,7 @@ public partial class MainWindow : Window
 
         ChunksGrid.ItemsSource = archive.Chunks;
         SignaturesGrid.ItemsSource = archive.Signatures;
+        HexPreviewText.Clear();
     }
 
     private void SetBusy(bool isBusy, string message)
