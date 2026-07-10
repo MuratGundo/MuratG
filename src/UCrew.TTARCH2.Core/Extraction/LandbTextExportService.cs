@@ -20,15 +20,28 @@ public sealed class LandbTextExportService
         foreach (LandbTextCandidate candidate in archive.Landb.TextCandidates.OrderBy(x => x.Offset))
         {
             token.ThrowIfCancellationRequested();
-            builder.Append("0x");
-            builder.Append(candidate.Offset.ToString("X8"));
-            builder.Append('\t');
-            builder.Append(candidate.ByteLength);
-            builder.Append('\t');
-            builder.AppendLine(candidate.Text.Replace("\r", "\\r").Replace("\n", "\\n"));
+
+            string cleanText = NormalizeSingleLine(candidate.Text);
+            if (string.IsNullOrWhiteSpace(cleanText))
+                continue;
+
+            builder.AppendLine(cleanText);
         }
 
-        await File.WriteAllTextAsync(outputPath, builder.ToString(), new UTF8Encoding(false), token)
+        await File.WriteAllTextAsync(
+                outputPath,
+                builder.ToString(),
+                new UTF8Encoding(false),
+                token)
             .ConfigureAwait(false);
+    }
+
+    private static string NormalizeSingleLine(string text)
+    {
+        return text
+            .Replace("\r\n", " ", StringComparison.Ordinal)
+            .Replace('\r', ' ')
+            .Replace('\n', ' ')
+            .Trim();
     }
 }
