@@ -10,6 +10,8 @@ public sealed class ArchiveModel
 
     public HeaderModel Header { get; set; } = new();
 
+    public EcttAnalysisModel Ectt { get; set; } = new();
+
     public List<EntropyPoint> EntropyMap { get; } = new();
 
     public List<PointerHit> Pointers { get; } = new();
@@ -18,7 +20,7 @@ public sealed class ArchiveModel
 
     public List<RegionModel> Regions { get; } = new();
 
-    public List<ECTTChunkInfo> ECTTChunks { get; } = new();
+    public List<ChunkModel> Chunks { get; } = new();
 
     public ValidationResult Validation { get; } = new();
 }
