@@ -14,6 +14,8 @@ public sealed class ArchiveModel
 
     public List<PointerHit> Pointers { get; } = new();
 
+    public List<SignatureHit> Signatures { get; } = new();
+
     public List<RegionModel> Regions { get; } = new();
 
     public ValidationResult Validation { get; } = new();
