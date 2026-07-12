@@ -16,7 +16,7 @@ public sealed class LandbCleanTextService
         CancellationToken token = default)
     {
         ParsedLandb parsed = await ParseAsync(landbPath, token).ConfigureAwait(false);
-        string output = string.Join('\n', parsed.Records.Select(record => EncodeTxtLine(RemoveFormatCodes(record.Text))));
+        string output = string.Join("\n", parsed.Records.Select(record => EncodeTxtLine(RemoveFormatCodes(record.Text))));
 
         string fullOutput = Path.GetFullPath(txtPath);
         string? directory = Path.GetDirectoryName(fullOutput);
@@ -60,10 +60,10 @@ public sealed class LandbCleanTextService
                 parsed.OriginalBytes.AsMemory((int)sourcePosition, (int)(record.HeaderOffset - sourcePosition)),
                 token).ConfigureAwait(false);
 
-            Span<byte> header = stackalloc byte[8];
-            BinaryPrimitives.WriteUInt32LittleEndian(header[..4], checked((uint)(restoredBytes.Length + 8)));
-            BinaryPrimitives.WriteUInt32LittleEndian(header[4..], checked((uint)restoredBytes.Length));
-            await rebuilt.WriteAsync(header.ToArray(), token).ConfigureAwait(false);
+            byte[] header = new byte[8];
+            BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(0, 4), checked((uint)(restoredBytes.Length + 8)));
+            BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(4, 4), checked((uint)restoredBytes.Length));
+            await rebuilt.WriteAsync(header, token).ConfigureAwait(false);
             await rebuilt.WriteAsync(restoredBytes, token).ConfigureAwait(false);
 
             sourcePosition = record.EndOffset;
