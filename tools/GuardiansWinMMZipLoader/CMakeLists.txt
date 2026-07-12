@@ -112,7 +112,7 @@ set_target_properties(
 add_library(
     version_proxy
     SHARED
-    src/version_proxy.cpp
+    src/version_proxy_min.cpp
     version_proxy.def)
 
 target_compile_definitions(
