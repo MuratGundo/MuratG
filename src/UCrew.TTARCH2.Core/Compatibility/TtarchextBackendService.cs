@@ -165,57 +165,124 @@ public sealed class TtarchextBackendService
         };
 
         string output = Path.GetFullPath(outputArchivePath);
-        string? outputDirectory = Path.GetDirectoryName(output);
-        if (!string.IsNullOrWhiteSpace(outputDirectory))
-            Directory.CreateDirectory(outputDirectory);
+        string outputDirectory = Path.GetDirectoryName(output)
+            ?? throw new InvalidOperationException("Çıktı klasörü belirlenemedi.");
+        Directory.CreateDirectory(outputDirectory);
 
         if (File.Exists(output))
             File.Delete(output);
 
-        // Guardians uses TTARCH2 version 7. Do not use -x: that flag forces the
-        // old archive format and the game silently ignores the resulting 0.ttarch.
-        string arguments = string.Join(' ',
-            "-b",
-            "-V",
-            GuardiansArchiveVersion,
-            GuardiansGameNumber,
-            Quote(output),
-            Quote(fullPatchDirectory));
+        // Some ttarchext 0.3.2 builds choose the archive family from the output
+        // extension before processing -V. Building directly as 0.ttarch may therefore
+        // leave an old-format/zero-filled placeholder. Always build to a temporary
+        // .ttarch2 file, validate its magic, then rename it to the requested 0.ttarch.
+        string temporaryOutput = Path.Combine(
+            outputDirectory,
+            $".ucrew_{Guid.NewGuid():N}.ttarch2");
 
-        ProcessRunResult process = await RunAsync(toolPath, arguments, Path.GetDirectoryName(toolPath)!, token)
-            .ConfigureAwait(false);
+        List<string> logs = new();
+        bool built = false;
+        string lastMagic = string.Empty;
 
-        result.StandardOutput = process.StandardOutput;
-        result.StandardError = process.StandardError;
-
-        if (process.ExitCode != 0 || !File.Exists(output) || new FileInfo(output).Length == 0)
+        string[] argumentVariants =
         {
-            result.Errors.Add(
-                $"0.ttarch yama oluşturma işlemi başarısız oldu (çıkış kodu {process.ExitCode}).\n" +
-                process.StandardError + Environment.NewLine + process.StandardOutput);
-            return result;
-        }
+            string.Join(' ',
+                "-b",
+                "-V",
+                GuardiansArchiveVersion,
+                GuardiansGameNumber,
+                Quote(temporaryOutput),
+                Quote(fullPatchDirectory)),
 
-        string magic = await ReadMagicAsync(output, token).ConfigureAwait(false);
-        if (!magic.Equals("NCTT", StringComparison.Ordinal) &&
-            !magic.Equals("zCTT", StringComparison.Ordinal))
+            string.Join(' ',
+                "-b",
+                GuardiansGameNumber,
+                Quote(temporaryOutput),
+                Quote(fullPatchDirectory))
+        };
+
+        try
+        {
+            foreach (string arguments in argumentVariants)
+            {
+                token.ThrowIfCancellationRequested();
+
+                if (File.Exists(temporaryOutput))
+                    File.Delete(temporaryOutput);
+
+                ProcessRunResult process = await RunAsync(
+                        toolPath,
+                        arguments,
+                        Path.GetDirectoryName(toolPath)!,
+                        token)
+                    .ConfigureAwait(false);
+
+                logs.Add(
+                    $"> ttarchext.exe {arguments}\n" +
+                    $"Çıkış kodu: {process.ExitCode}\n" +
+                    process.StandardError + Environment.NewLine + process.StandardOutput);
+
+                result.StandardOutput = process.StandardOutput;
+                result.StandardError = process.StandardError;
+
+                if (process.ExitCode != 0 ||
+                    !File.Exists(temporaryOutput) ||
+                    new FileInfo(temporaryOutput).Length < 4)
+                {
+                    continue;
+                }
+
+                lastMagic = await ReadMagicAsync(temporaryOutput, token).ConfigureAwait(false);
+                if (!IsTtarch2Magic(lastMagic))
+                    continue;
+
+                built = true;
+                break;
+            }
+
+            if (!built)
+            {
+                string headerText = string.IsNullOrEmpty(lastMagic)
+                    ? "boş veya oluşturulamadı"
+                    : FormatMagic(lastMagic);
+
+                result.Errors.Add(
+                    "ttarchext geçerli bir Guardians TTARCH2 yaması oluşturamadı. " +
+                    $"Son başlık: {headerText}.\n\n" +
+                    string.Join("\n\n", logs));
+                return result;
+            }
+
+            File.Move(temporaryOutput, output, overwrite: true);
+
+            string finalMagic = await ReadMagicAsync(output, token).ConfigureAwait(false);
+            if (!IsTtarch2Magic(finalMagic))
+            {
+                File.Delete(output);
+                result.Errors.Add(
+                    $"Oluşturulan dosyanın son başlığı geçersiz: {FormatMagic(finalMagic)}. " +
+                    "Beklenen başlık NCTT veya zCTT.");
+            }
+        }
+        finally
         {
             try
             {
-                File.Delete(output);
+                if (File.Exists(temporaryOutput))
+                    File.Delete(temporaryOutput);
             }
             catch
             {
-                // The validation error below is more important than cleanup failure.
+                // Temporary cleanup failure must not hide the actual build result.
             }
-
-            result.Errors.Add(
-                $"Oluşturulan dosya Guardians uyumlu TTARCH2 değil. Başlık: {FormatMagic(magic)}. " +
-                "Beklenen başlık NCTT veya zCTT. ttarchext.exe sürümünü kontrol et.");
         }
 
         return result;
     }
+
+    private static bool IsTtarch2Magic(string magic) =>
+        magic.Equals("NCTT", StringComparison.Ordinal) ||
+        magic.Equals("zCTT", StringComparison.Ordinal);
 
     private static async Task<string> ReadMagicAsync(string path, CancellationToken token)
     {
