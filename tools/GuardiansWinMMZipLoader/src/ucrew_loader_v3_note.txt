@@ -1,0 +1,1 @@
+Guardians ZIP loader v0.3: A/W File API, attribute and find hooks, diagnostic routing logs.
