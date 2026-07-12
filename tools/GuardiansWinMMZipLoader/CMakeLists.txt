@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project(
     GuardiansWinMMZipLoader
-    VERSION 0.1.0
+    VERSION 0.1.1
     LANGUAGES C CXX)
 
 if(NOT WIN32)
@@ -22,6 +22,16 @@ if(MSVC)
     set(
         CMAKE_MSVC_RUNTIME_LIBRARY
         "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
+set(
+    WINMM_PROXY_DEF
+    "${CMAKE_CURRENT_SOURCE_DIR}/winmm_proxy.generated.def")
+
+if(NOT EXISTS "${WINMM_PROXY_DEF}")
+    message(
+        FATAL_ERROR
+        "winmm_proxy.generated.def bulunamadı. Önce GENERATE_WINMM_DEF.ps1 çalıştırılmalıdır.")
 endif()
 
 include(FetchContent)
@@ -81,7 +91,7 @@ add_library(
     guardians_winmm
     SHARED
     src/winmm_proxy.cpp
-    winmm_proxy.def)
+    "${WINMM_PROXY_DEF}")
 
 target_compile_definitions(
     guardians_winmm
