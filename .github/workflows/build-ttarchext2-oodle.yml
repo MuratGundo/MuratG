@@ -1,0 +1,55 @@
+name: Build TTArchExt Oodle
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-ttarchext2-oodle.yml"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install MSYS2 UCRT64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            make
+            mingw-w64-ucrt-x86_64-gcc
+
+      - name: Clone and compile Oodle-capable TTArchExt
+        shell: msys2 {0}
+        run: |
+          set -e
+          git clone --depth 1 https://github.com/slankka/ttarchext2.git source
+          cd source
+
+          gcc -O2 -Wall -static -static-libgcc -I zlib \
+            -o ttarchext_oodle_x64.exe \
+            ttarchext.c blowfish_ttarch.c oodle.c \
+            zlib/adler32.c zlib/compress.c zlib/crc32.c zlib/deflate.c \
+            zlib/infback.c zlib/inffast.c zlib/inflate.c zlib/inftrees.c \
+            zlib/trees.c zlib/uncompr.c zlib/zutil.c
+
+          ./ttarchext_oodle_x64.exe > help.txt 2>&1 || true
+          grep -q -- "-z" help.txt
+          grep -q -- "-4" help.txt
+
+          mkdir -p ../artifact
+          cp ttarchext_oodle_x64.exe ../artifact/
+          cp help.txt ../artifact/
+          cp README.md ../artifact/
+
+      - name: Upload Windows executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ttarchext-oodle-x64
+          path: artifact/
+          if-no-files-found: error
