@@ -1,24 +1,28 @@
-GUARDIANS WINMM ZIP LOADER — KURULUM VE TEST
+GUARDIANS VERSION ZIP LOADER — KURULUM VE TEST
 
 GEREKLİ DOSYALAR
-- winmm.dll
+- version.dll
+- ucrew_loader.dll
 - ucrew_loader.ini
 - UCREW_Guardians_TR.zip
 
 KURULUM
-Bu üç dosyayı Guardians.exe dosyasının bulunduğu ana oyun klasörüne koy.
+1. Oyun klasöründeki eski test winmm.dll dosyasını mutlaka sil.
+2. Oyun klasöründe önceden version.dll varsa önce yedekle.
+3. Yukarıdaki dört dosyayı Guardians.exe dosyasının yanına koy.
 
 Örnek:
 Guardians of the Galaxy\
   Guardians.exe
-  winmm.dll
+  version.dll
+  ucrew_loader.dll
   ucrew_loader.ini
   UCREW_Guardians_TR.zip
 
 ÖNEMLİ
-- Oyun klasöründe daha önce başka bir winmm.dll varsa önce yedekle.
+- Eski winmm.dll kalırsa FMOD waveOutClose giriş noktası hatası devam eder.
 - _resdesc_50_Menu.lua orijinal durumda olsun.
-- Özel 0.ttarch, 0.ttarch2 veya GoG_pc_UCREW_TR.ttarch2 kalmasın.
+- Özel 0.ttarch, 0.ttarch2, GoG_pc_UCREW_TR.ttarch2 ve _resdesc_99_UCREW_TR.lua kalmasın.
 - İlk testte ZIP'e yalnızca gevşek olarak çalıştığı doğrulanmış bir LANDb koy.
 
 ZIP HAZIRLAMA
@@ -37,7 +41,8 @@ TEST
 
 GERİ ALMA
 Oyun klasöründen şunları sil:
-- winmm.dll
+- version.dll
+- ucrew_loader.dll
 - ucrew_loader.ini
 - UCREW_Guardians_TR.zip
 - ucrew_winmm.log
