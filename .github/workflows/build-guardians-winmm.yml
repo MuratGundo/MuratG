@@ -27,10 +27,21 @@ jobs:
           -A x64
 
       - name: Build Release
-        run: >
-          cmake
-          --build build/GuardiansWinMMZipLoader
-          --config Release
+        shell: pwsh
+        run: |
+          cmake --build build/GuardiansWinMMZipLoader --config Release --verbose 2>&1 |
+            Tee-Object -FilePath guardians-winmm-build.log
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Guardians-WinMM-Build-Log
+          path: guardians-winmm-build.log
+          if-no-files-found: warn
 
       - name: Prepare package
         shell: pwsh
@@ -58,7 +69,7 @@ jobs:
             "tools/GuardiansWinMMZipLoader/KURULUM_VE_TEST.txt" `
             "$package/KURULUM_VE_TEST.txt"
 
-      - name: Upload artifact
+      - name: Upload loader package
         uses: actions/upload-artifact@v4
         with:
           name: Guardians-WinMM-ZIP-Loader-x64
