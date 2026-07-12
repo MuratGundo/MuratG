@@ -18,6 +18,12 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(MSVC)
+    set(
+        CMAKE_MSVC_RUNTIME_LIBRARY
+        "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -102,8 +108,7 @@ set_target_properties(
     guardians_winmm
     PROPERTIES
         OUTPUT_NAME "winmm"
-        PREFIX ""
-        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        PREFIX "")
 
 install(
     TARGETS guardians_winmm
