@@ -7,7 +7,10 @@ namespace UCrew.TTARCH2.Core.Compatibility;
 
 public sealed class TtarchextBackendService
 {
-    private const string GuardiansKeyHex = "476f7447"; // GotG
+    // ttarchext 0.3.2 game table index for Marvel's Guardians of the Galaxy.
+    // Using -k 476f7447 ("GotG") is not equivalent to the built-in 55-byte key
+    // used by ttarchext and causes encrypted chunks to fail during deflate decode.
+    private const string GuardiansGameNumber = "62";
 
     public bool TryFindTool(out string toolPath)
     {
@@ -65,7 +68,6 @@ public sealed class TtarchextBackendService
         };
 
         Directory.CreateDirectory(workingDirectory);
-        PrepareOodleRuntime(toolPath, fullArchivePath, result.Warnings);
 
         if (Directory.Exists(extractionDirectory))
             Directory.Delete(extractionDirectory, recursive: true);
@@ -73,8 +75,7 @@ public sealed class TtarchextBackendService
 
         string arguments = string.Join(' ',
             "-o",
-            "-k", GuardiansKeyHex,
-            "0",
+            GuardiansGameNumber,
             Quote(fullArchivePath),
             Quote(extractionDirectory));
 
@@ -86,8 +87,14 @@ public sealed class TtarchextBackendService
 
         if (process.ExitCode != 0)
         {
+            string combined = process.StandardError + Environment.NewLine + process.StandardOutput;
+            string hint = combined.Contains("zlib/deflate", StringComparison.OrdinalIgnoreCase)
+                ? Environment.NewLine + Environment.NewLine +
+                  "Arşiv, bu ttarchext sürümünün desteklemediği Oodle sıkıştırması kullanıyor olabilir veya dosya bozuk olabilir."
+                : string.Empty;
+
             result.Errors.Add(
-                $"ttarchext çıkarma işlemi başarısız oldu (çıkış kodu {process.ExitCode}).\n{process.StandardError}\n{process.StandardOutput}");
+                $"ttarchext çıkarma işlemi başarısız oldu (çıkış kodu {process.ExitCode}).\n{combined}{hint}");
             return result;
         }
 
@@ -113,7 +120,7 @@ public sealed class TtarchextBackendService
                 Offset = -1,
                 Size = info.Length,
                 Confidence = 1.0,
-                Source = "ttarchext / GotG / Oodle"
+                Source = "ttarchext 0.3.2 / Guardians game key 62"
             });
         }
 
@@ -146,8 +153,6 @@ public sealed class TtarchextBackendService
             ToolPath = toolPath
         };
 
-        PrepareOodleRuntime(toolPath, sourceArchivePath, result.Warnings);
-
         string output = Path.GetFullPath(outputArchivePath);
         string? outputDirectory = Path.GetDirectoryName(output);
         if (!string.IsNullOrWhiteSpace(outputDirectory))
@@ -156,10 +161,11 @@ public sealed class TtarchextBackendService
         if (File.Exists(output))
             File.Delete(output);
 
+        // Stock ttarchext 0.3.2 does not support the custom -z Oodle rebuild switch.
+        // Build a normal/uncompressed TTARCH2 using the built-in Guardians profile.
         string arguments = string.Join(' ',
-            "-b", "-z", "-L", "-V", "7", "-4",
-            "-k", GuardiansKeyHex,
-            "0",
+            "-b",
+            GuardiansGameNumber,
             Quote(output),
             Quote(Path.GetFullPath(extractedDirectory)));
 
@@ -187,42 +193,6 @@ public sealed class TtarchextBackendService
             "UCrewTTARCH2",
             "Work");
         return Path.Combine(root, id);
-    }
-
-    private static void PrepareOodleRuntime(
-        string toolPath,
-        string archivePath,
-        ICollection<string> warnings)
-    {
-        string toolDirectory = Path.GetDirectoryName(toolPath)!;
-        string archiveDirectory = Path.GetDirectoryName(Path.GetFullPath(archivePath))!;
-
-        string[] patterns =
-        {
-            "oo2core_8_win64.dll",
-            "oo2core_7_win64.dll",
-            "oo2core_6_win64.dll",
-            "oo2core_5_win64.dll",
-            "oo2core_4_win64.dll",
-            "oodle_dll.dll"
-        };
-
-        if (patterns.Any(name => File.Exists(Path.Combine(toolDirectory, name))))
-            return;
-
-        foreach (string name in patterns)
-        {
-            string source = Path.Combine(archiveDirectory, name);
-            if (!File.Exists(source))
-                continue;
-
-            string destination = Path.Combine(toolDirectory, name);
-            File.Copy(source, destination, overwrite: true);
-            return;
-        }
-
-        warnings.Add(
-            "Oodle DLL bulunamadı. oo2core_5_win64.dll veya uyumlu bir oo2core DLL dosyasını ttarchext.exe yanına koymalısın.");
     }
 
     private static async Task<ProcessRunResult> RunAsync(
