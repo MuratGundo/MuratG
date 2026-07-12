@@ -1,0 +1,51 @@
+name: U-CREW TTARCH2 Sade Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "src/UCrew.TTARCH2.Core/**"
+      - "src/UCrew.TTARCH2.GUI/**"
+      - "tests/UCrew.TTARCH2.Core.Tests/**"
+      - "MuratG.sln"
+      - ".github/workflows/ucrew-ttarch2-sade-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Kaynak kodu al
+        uses: actions/checkout@v4
+
+      - name: .NET 8 kur
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Geri yükle
+        run: dotnet restore MuratG.sln
+
+      - name: Derle
+        run: dotnet build MuratG.sln -c Release --no-restore
+
+      - name: Testleri çalıştır
+        run: dotnet test tests/UCrew.TTARCH2.Core.Tests/UCrew.TTARCH2.Core.Tests.csproj -c Release --no-build
+
+      - name: Windows x64 yayınla
+        run: >-
+          dotnet publish src/UCrew.TTARCH2.GUI/UCrew.TTARCH2.GUI.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=false
+          -p:PublishReadyToRun=false
+          -o artifact/UCrew-TTARCH2-Sade-win-x64
+
+      - name: Paketi yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: UCrew-TTARCH2-Sade-win-x64
+          path: artifact/UCrew-TTARCH2-Sade-win-x64
+          if-no-files-found: error
