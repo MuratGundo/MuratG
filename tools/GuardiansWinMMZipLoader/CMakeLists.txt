@@ -59,17 +59,17 @@ if(NOT miniz_source_POPULATED)
     FetchContent_Populate(miniz_source)
 endif()
 
-add_library(
-    miniz STATIC
-    "${miniz_source_SOURCE_DIR}/miniz.c"
-    "${miniz_source_SOURCE_DIR}/miniz_tdef.c"
-    "${miniz_source_SOURCE_DIR}/miniz_tinfl.c"
-    "${miniz_source_SOURCE_DIR}/miniz_zip.c")
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_FUZZERS OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(INSTALL_PROJECT OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(AMALGAMATE_SOURCES OFF CACHE BOOL "" FORCE)
 
-target_include_directories(
-    miniz
-    PUBLIC
-        "${miniz_source_SOURCE_DIR}")
+add_subdirectory(
+    "${miniz_source_SOURCE_DIR}"
+    "${miniz_source_BINARY_DIR}"
+    EXCLUDE_FROM_ALL)
 
 add_library(
     guardians_winmm
