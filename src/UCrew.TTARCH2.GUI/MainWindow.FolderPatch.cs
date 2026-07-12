@@ -1,3 +1,4 @@
+using System.Windows;
 using Forms = System.Windows.Forms;
 using Microsoft.Win32;
 using UCrew.TTARCH2.Core.Compatibility;
