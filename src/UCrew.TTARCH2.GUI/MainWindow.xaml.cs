@@ -1,101 +1,77 @@
-using System.Globalization;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
-using UCrew.TTARCH2.Core.Analysis;
-using UCrew.TTARCH2.Core.Extraction;
+using UCrew.TTARCH2.Core.Compatibility;
+using UCrew.TTARCH2.Core.Localization;
 using UCrew.TTARCH2.Core.Models;
-using UCrew.TTARCH2.Core.Preview;
-using UCrew.TTARCH2.Core.Rebuild;
-using UCrew.TTARCH2.Core.Reporting;
 
 namespace UCrew.TTARCH2.GUI;
 
 public partial class MainWindow : Window
 {
-    private readonly ArchiveAnalysisService _analysisService = new();
-    private readonly HexPreviewService _hexPreviewService = new();
-    private readonly ChunkTypeDetector _chunkTypeDetector = new();
-    private readonly TextPreviewService _textPreviewService = new();
-    private readonly FixedSizeChunkPatchService _patchService = new();
-    private ArchiveModel? _currentArchive;
-    private ChunkTypeInfo? _selectedChunkType;
+    private readonly TtarchextBackendService _backend = new();
+    private readonly LandbCleanTextService _landbText = new();
+    private readonly HashSet<string> _modifiedFiles = new(StringComparer.OrdinalIgnoreCase);
+
+    private List<ArchiveFileRow> _allFiles = new();
+    private string? _archivePath;
+    private string? _extractionRoot;
+    private bool _isBusy;
 
     public MainWindow()
     {
         InitializeComponent();
-        RefreshResourceCatalog();
+        UpdateButtonState();
     }
 
     private async void OpenArchive_Click(object sender, RoutedEventArgs e)
     {
         OpenFileDialog dialog = new()
         {
-            Title = "TTARCH2 veya LANDb dosyası aç",
-            Filter = "Telltale dosyaları (*.ttarch2;*.landb)|*.ttarch2;*.landb|Tüm dosyalar (*.*)|*.*",
+            Title = "Guardians TTARCH2 arşivini seç",
+            Filter = "TTARCH2 dosyası (*.ttarch2)|*.ttarch2|Tüm dosyalar (*.*)|*.*",
             CheckFileExists = true,
             Multiselect = false
         };
 
-        if (dialog.ShowDialog(this) == true)
-            await AnalyzeFileAsync(dialog.FileName);
-    }
-
-    private async Task AnalyzeFileAsync(string filePath)
-    {
-        try
-        {
-            SetBusy(true, "Dosya analiz ediliyor...");
-            ArchiveModel archive = await _analysisService.AnalyzeAsync(filePath);
-            _currentArchive = archive;
-            _selectedChunkType = null;
-            DisplayArchive(archive);
-            StatusText.Text = $"Analiz tamamlandı: {archive.Chunks.Count:N0} chunk, {archive.Landb.TextCandidates.Count:N0} LANDb metin adayı.";
-        }
-        catch (Exception ex)
-        {
-            _currentArchive = null;
-            _selectedChunkType = null;
-            StatusText.Text = "Analiz başarısız.";
-            MessageBox.Show(this, ex.Message, "Analiz Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-        finally
-        {
-            SetBusy(false, StatusText.Text);
-        }
-    }
-
-    private async void SaveReport_Click(object sender, RoutedEventArgs e)
-    {
-        if (_currentArchive is null)
-        {
-            MessageBox.Show(this, "Önce bir dosya açmalısın.", "Rapor", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        SaveFileDialog dialog = new()
-        {
-            Title = "JSON analiz raporunu kaydet",
-            Filter = "JSON dosyası (*.json)|*.json",
-            FileName = Path.GetFileNameWithoutExtension(_currentArchive.FileName) + ".analysis.json",
-            AddExtension = true,
-            DefaultExt = ".json"
-        };
-
         if (dialog.ShowDialog(this) != true)
             return;
 
         try
         {
-            SetBusy(true, "JSON raporu kaydediliyor...");
-            await new JsonReportWriter().WriteAsync(_currentArchive, dialog.FileName);
-            StatusText.Text = $"Rapor kaydedildi: {dialog.FileName}";
+            SetBusy(true, "TTARCH2 açılıyor ve gerçek dosya listesi çıkarılıyor...");
+
+            TtarchextBackendResult result = await _backend
+                .ExtractGuardiansArchiveAsync(dialog.FileName)
+                .ConfigureAwait(true);
+
+            if (!result.Success)
+            {
+                throw new InvalidOperationException(string.Join(Environment.NewLine, result.Errors));
+            }
+
+            _archivePath = Path.GetFullPath(dialog.FileName);
+            _extractionRoot = result.WorkingDirectory;
+            _modifiedFiles.Clear();
+            _allFiles = BuildIndexedRows(result.Resources, result.StandardOutput);
+
+            ApplyFilter();
+            ArchiveInfoText.Text =
+                $"{Path.GetFileName(_archivePath)}\n" +
+                $"{_allFiles.Count:N0} dosya • {_allFiles.Count(file => file.IsLandb):N0} LANDb";
+
+            string warning = result.Warnings.Count > 0
+                ? $" Uyarı: {result.Warnings[0]}"
+                : string.Empty;
+
+            StatusText.Text =
+                $"Arşiv açıldı. Dosya indeksleri gerçek çıkarma sırasına göre 0–{Math.Max(0, _allFiles.Count - 1):N0} olarak düzeltildi.{warning}";
         }
         catch (Exception ex)
         {
-            StatusText.Text = "Rapor kaydedilemedi.";
-            MessageBox.Show(this, ex.Message, "Rapor Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
+            ResetArchiveState();
+            MessageBox.Show(this, ex.Message, "TTARCH2 Açma Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "TTARCH2 açılamadı.";
         }
         finally
         {
@@ -103,86 +79,16 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void DumpChunks_Click(object sender, RoutedEventArgs e)
+    private async void ExportTxt_Click(object sender, RoutedEventArgs e)
     {
-        if (_currentArchive is null || _currentArchive.Chunks.Count == 0)
-        {
-            MessageBox.Show(this, "Çıkarılabilecek chunk bulunamadı.", "Chunk Çıkarma", MessageBoxButton.OK, MessageBoxImage.Information);
+        if (FilesGrid.SelectedItem is not ArchiveFileRow selected || !selected.IsLandb)
             return;
-        }
-
-        OpenFolderDialog dialog = new() { Title = "Chunkların çıkarılacağı klasörü seç", Multiselect = false };
-        if (dialog.ShowDialog(this) != true)
-            return;
-
-        try
-        {
-            SetBusy(true, "Chunklar dışarı çıkarılıyor...");
-            int count = await new ChunkDumpService().DumpAsync(_currentArchive, dialog.FolderName);
-            StatusText.Text = $"{count:N0} chunk dışarı çıkarıldı.";
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = "Chunk çıkarma başarısız.";
-            MessageBox.Show(this, ex.Message, "Chunk Çıkarma Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-        finally
-        {
-            SetBusy(false, StatusText.Text);
-        }
-    }
-
-    private async void ExportSelectedChunk_Click(object sender, RoutedEventArgs e)
-    {
-        if (_currentArchive is null || ChunksGrid.SelectedItem is not ChunkModel chunk)
-        {
-            MessageBox.Show(this, "Önce bir chunk seçmelisin.", "Chunk Kaydet", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        _selectedChunkType ??= await _chunkTypeDetector.DetectAsync(_currentArchive, chunk);
-        SaveFileDialog dialog = new()
-        {
-            Title = "Seçili chunkı kaydet",
-            Filter = $"{_selectedChunkType.Name} (*{_selectedChunkType.Extension})|*{_selectedChunkType.Extension}|Tüm dosyalar (*.*)|*.*",
-            FileName = $"chunk_{chunk.Index:D4}_0x{chunk.Offset:X}{_selectedChunkType.Extension}",
-            AddExtension = true,
-            DefaultExt = _selectedChunkType.Extension
-        };
-
-        if (dialog.ShowDialog(this) != true)
-            return;
-
-        try
-        {
-            SetBusy(true, "Seçili chunk kaydediliyor...");
-            await new SingleChunkExportService().ExportAsync(_currentArchive, chunk, dialog.FileName);
-            StatusText.Text = $"Chunk kaydedildi: {dialog.FileName}";
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = "Seçili chunk kaydedilemedi.";
-            MessageBox.Show(this, ex.Message, "Chunk Kaydetme Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-        finally
-        {
-            SetBusy(false, StatusText.Text);
-        }
-    }
-
-    private async void SaveEditedText_Click(object sender, RoutedEventArgs e)
-    {
-        if (!TextEditor.IsEnabled || ChunksGrid.SelectedItem is not ChunkModel chunk)
-        {
-            MessageBox.Show(this, "Önce metin olarak algılanan bir chunk seçmelisin.", "Metin Kaydet", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
 
         SaveFileDialog dialog = new()
         {
-            Title = "Düzenlenmiş metni ayrı dosya olarak kaydet",
-            Filter = "UTF-8 metin (*.txt)|*.txt|Tüm dosyalar (*.*)|*.*",
-            FileName = $"chunk_{chunk.Index:D4}_edited.txt",
+            Title = "Temiz TXT dosyasını kaydet",
+            Filter = "UTF-8 metin (*.txt)|*.txt",
+            FileName = Path.GetFileNameWithoutExtension(selected.Name) + ".clean.txt",
             AddExtension = true,
             DefaultExt = ".txt"
         };
@@ -192,14 +98,16 @@ public partial class MainWindow : Window
 
         try
         {
-            SetBusy(true, "Düzenlenmiş metin kaydediliyor...");
-            await _textPreviewService.SaveEditedTextAsync(TextEditor.Text, dialog.FileName);
-            StatusText.Text = $"Metin kaydedildi: {dialog.FileName}";
+            SetBusy(true, "Seçili LANDb dosyasından temiz TXT çıkarılıyor...");
+            int count = await _landbText.ExportAsync(selected.ExtractedPath, dialog.FileName).ConfigureAwait(true);
+            selected.State = "TXT çıkarıldı";
+            FilesGrid.Items.Refresh();
+            StatusText.Text = $"{count:N0} temiz metin kaydı çıkarıldı: {dialog.FileName}";
         }
         catch (Exception ex)
         {
-            StatusText.Text = "Metin kaydedilemedi.";
-            MessageBox.Show(this, ex.Message, "Metin Kaydetme Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, ex.Message, "TXT Çıkarma Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "Temiz TXT çıkarılamadı.";
         }
         finally
         {
@@ -207,28 +115,83 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void PatchTextToCopy_Click(object sender, RoutedEventArgs e)
+    private async void ImportTxt_Click(object sender, RoutedEventArgs e)
     {
-        if (_currentArchive is null || !TextEditor.IsEnabled || ChunksGrid.SelectedItem is not ChunkModel chunk)
-        {
-            MessageBox.Show(this, "Önce tam olarak açılmış bir metin chunkı seçmelisin.", "Arşiv Kopyasına Uygula", MessageBoxButton.OK, MessageBoxImage.Information);
+        if (FilesGrid.SelectedItem is not ArchiveFileRow selected || !selected.IsLandb || _extractionRoot is null)
             return;
-        }
 
-        int editedByteCount = Encoding.UTF8.GetByteCount(TextEditor.Text);
-        if (editedByteCount != chunk.Length)
+        OpenFileDialog dialog = new()
         {
-            MessageBox.Show(this,
-                $"Geri yazma için UTF-8 bayt boyutu birebir aynı olmalı.\n\nChunk boyutu: {chunk.Length:N0} bayt\nDüzenlenmiş metin: {editedByteCount:N0} bayt",
-                "Boyut Uyuşmazlığı", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Title = "Çevrilmiş temiz TXT dosyasını seç",
+            Filter = "UTF-8 metin (*.txt)|*.txt|Tüm dosyalar (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog(this) != true)
             return;
+
+        string backupPath = GetBackupPath(selected);
+        Directory.CreateDirectory(Path.GetDirectoryName(backupPath)!);
+
+        if (!File.Exists(backupPath))
+            File.Copy(selected.ExtractedPath, backupPath, overwrite: false);
+
+        try
+        {
+            SetBusy(true, "Çevrilmiş TXT seçili LANDb dosyasına aktarılıyor...");
+            int count = await _landbText
+                .ImportAsync(backupPath, dialog.FileName, selected.ExtractedPath)
+                .ConfigureAwait(true);
+
+            selected.Size = new FileInfo(selected.ExtractedPath).Length;
+            selected.State = "Değiştirildi";
+            _modifiedFiles.Add(selected.RelativePath);
+            FilesGrid.Items.Refresh();
+
+            StatusText.Text =
+                $"{count:N0} çeviri kaydı içe aktarıldı. Değiştirilen LANDb: {selected.Name}";
+        }
+        catch (Exception ex)
+        {
+            File.Copy(backupPath, selected.ExtractedPath, overwrite: true);
+            selected.Size = new FileInfo(selected.ExtractedPath).Length;
+            selected.State = "Orijinal";
+            _modifiedFiles.Remove(selected.RelativePath);
+            FilesGrid.Items.Refresh();
+
+            MessageBox.Show(this, ex.Message, "TXT İçe Aktarma Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "TXT içe aktarılamadı; çalışma dosyası orijinale döndürüldü.";
+        }
+        finally
+        {
+            SetBusy(false, StatusText.Text);
+        }
+    }
+
+    private async void BuildArchive_Click(object sender, RoutedEventArgs e)
+    {
+        if (_archivePath is null || _extractionRoot is null)
+            return;
+
+        if (_modifiedFiles.Count == 0)
+        {
+            MessageBoxResult answer = MessageBox.Show(
+                this,
+                "Henüz değiştirilmiş LANDb yok. Yine de yeni TTARCH2 oluşturulsun mu?",
+                "TTARCH2 Oluştur",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (answer != MessageBoxResult.Yes)
+                return;
         }
 
         SaveFileDialog dialog = new()
         {
-            Title = "Düzenlenmiş arşiv kopyasını kaydet",
-            Filter = "TTARCH2 dosyası (*.ttarch2)|*.ttarch2|Tüm dosyalar (*.*)|*.*",
-            FileName = Path.GetFileNameWithoutExtension(_currentArchive.FileName) + ".patched.ttarch2",
+            Title = "Yeni TTARCH2 dosyasını kaydet",
+            Filter = "TTARCH2 dosyası (*.ttarch2)|*.ttarch2",
+            FileName = Path.GetFileNameWithoutExtension(_archivePath) + ".TR.ttarch2",
             AddExtension = true,
             DefaultExt = ".ttarch2"
         };
@@ -238,15 +201,32 @@ public partial class MainWindow : Window
 
         try
         {
-            SetBusy(true, "Arşiv kopyalanıyor ve seçili chunk güncelleniyor...");
-            await _patchService.PatchTextToCopyAsync(_currentArchive, chunk, TextEditor.Text, dialog.FileName);
-            StatusText.Text = $"Düzenlenmiş arşiv kopyası oluşturuldu: {dialog.FileName}";
-            MessageBox.Show(this, "Orijinal arşiv değiştirilmedi. Düzenleme yeni kopyaya uygulandı.", "İşlem Tamamlandı", MessageBoxButton.OK, MessageBoxImage.Information);
+            SetBusy(true, "Oodle sıkıştırmalı yeni TTARCH2 oluşturuluyor...");
+
+            TtarchextBackendResult result = await _backend
+                .RebuildGuardiansArchiveAsync(_extractionRoot, dialog.FileName, _archivePath)
+                .ConfigureAwait(true);
+
+            if (!result.Success)
+                throw new InvalidOperationException(string.Join(Environment.NewLine, result.Errors));
+
+            long outputSize = new FileInfo(dialog.FileName).Length;
+            StatusText.Text = $"Yeni TTARCH2 oluşturuldu: {dialog.FileName}";
+
+            MessageBox.Show(
+                this,
+                $"Paketleme tamamlandı.\n\n" +
+                $"Değiştirilen LANDb: {_modifiedFiles.Count:N0}\n" +
+                $"Çıktı boyutu: {outputSize:N0} bayt\n\n" +
+                $"{dialog.FileName}",
+                "TTARCH2 Hazır",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            StatusText.Text = "Arşiv kopyasına uygulama başarısız.";
-            MessageBox.Show(this, ex.Message, "Geri Yazma Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this, ex.Message, "TTARCH2 Paketleme Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "Yeni TTARCH2 oluşturulamadı.";
         }
         finally
         {
@@ -254,182 +234,134 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void ExportLandbCandidates_Click(object sender, RoutedEventArgs e)
+    private void Filter_Changed(object sender, RoutedEventArgs e)
     {
-        if (_currentArchive is null || _currentArchive.Landb.TextCandidates.Count == 0)
-        {
-            MessageBox.Show(this, "Dışa aktarılabilecek LANDb metin adayı bulunamadı.", "LANDb", MessageBoxButton.OK, MessageBoxImage.Information);
+        if (FilesGrid is null)
             return;
-        }
-
-        SaveFileDialog dialog = new()
-        {
-            Title = "LANDb metin adaylarını kaydet",
-            Filter = "UTF-8 metin (*.txt)|*.txt",
-            FileName = Path.GetFileNameWithoutExtension(_currentArchive.FileName) + ".landb_candidates.txt",
-            AddExtension = true,
-            DefaultExt = ".txt"
-        };
-
-        if (dialog.ShowDialog(this) != true)
-            return;
-
-        try
-        {
-            SetBusy(true, "LANDb adayları dışa aktarılıyor...");
-            await new LandbTextExportService().ExportAsync(_currentArchive, dialog.FileName);
-            StatusText.Text = $"LANDb adayları kaydedildi: {dialog.FileName}";
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = "LANDb adayları kaydedilemedi.";
-            MessageBox.Show(this, ex.Message, "LANDb Dışa Aktarma Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-        finally
-        {
-            SetBusy(false, StatusText.Text);
-        }
+        ApplyFilter();
     }
 
-    private void TextEditor_TextChanged(object sender, TextChangedEventArgs e) => UpdateTextByteCount();
-
-    private void UpdateTextByteCount()
+    private void Filter_Changed(object sender, TextChangedEventArgs e)
     {
-        if (ChunksGrid.SelectedItem is not ChunkModel chunk || !TextEditor.IsEnabled)
-        {
-            TextByteCountInfo.Text = "UTF-8 boyutu: -";
+        if (FilesGrid is null)
             return;
-        }
-
-        int bytes = Encoding.UTF8.GetByteCount(TextEditor.Text);
-        string state = bytes == chunk.Length ? "UYUMLU" : "UYUŞMUYOR";
-        TextByteCountInfo.Text = $"UTF-8 boyutu: {bytes:N0} / {chunk.Length:N0} bayt — {state}";
+        ApplyFilter();
     }
 
-    private async void ChunksGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void FilesGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_currentArchive is null || ChunksGrid.SelectedItem is not ChunkModel chunk)
-        {
-            ClearChunkPreview();
-            return;
-        }
-
-        try
-        {
-            StatusText.Text = $"Chunk {chunk.Index} analiz ediliyor...";
-            Task<string> previewTask = _hexPreviewService.CreateChunkPreviewAsync(_currentArchive, chunk);
-            Task<ChunkTypeInfo> typeTask = _chunkTypeDetector.DetectAsync(_currentArchive, chunk);
-            await Task.WhenAll(previewTask, typeTask);
-
-            _selectedChunkType = typeTask.Result;
-            HexPreviewText.Text = previewTask.Result;
-            SelectedChunkTypeText.Text = $"{_selectedChunkType.Name} / {_selectedChunkType.Category} / güven {_selectedChunkType.Confidence:0.00}";
-
-            bool isText = string.Equals(_selectedChunkType.Category, "Text", StringComparison.OrdinalIgnoreCase);
-            bool canLoadEntireText = isText && chunk.Length <= TextPreviewService.DefaultPreviewLength;
-            TextEditor.IsEnabled = canLoadEntireText;
-            TextEditor.Text = canLoadEntireText
-                ? await _textPreviewService.ReadChunkTextAsync(_currentArchive, chunk)
-                : string.Empty;
-            TextPreviewInfo.Text = canLoadEntireText
-                ? "Metin UTF-8 olarak tam açıldı. Aynı bayt boyutunda kalırsa arşiv kopyasına uygulanabilir."
-                : isText
-                    ? "Chunk 256 KB sınırını aştığı için güvenli düzenleme devre dışı."
-                    : "Seçili chunk metin olarak algılanmadı.";
-
-            UpdateTextByteCount();
-            StatusText.Text = $"Chunk {chunk.Index} önizlemesi hazır.";
-        }
-        catch (Exception ex)
-        {
-            ClearChunkPreview();
-            HexPreviewText.Text = $"Önizleme hatası: {ex.Message}";
-            StatusText.Text = "Chunk önizleme başarısız.";
-        }
+        UpdateButtonState();
     }
 
-    private void LandbFilter_Changed(object sender, EventArgs e)
+    private void ApplyFilter()
     {
-        if (!IsLoaded || _currentArchive is null)
+        if (FilesGrid is null)
             return;
 
-        ApplyLandbFilter();
-    }
+        string search = SearchTextBox?.Text?.Trim() ?? string.Empty;
+        bool landbOnly = LandbOnlyCheckBox?.IsChecked == true;
 
-    private void ApplyLandbFilter()
-    {
-        if (LandbCandidatesGrid is null || LandbSummaryText is null)
-            return;
-
-        if (_currentArchive is null)
-        {
-            LandbCandidatesGrid.ItemsSource = null;
-            LandbSummaryText.Text = "LANDb analizi yok.";
-            return;
-        }
-
-        string search = LandbSearchText?.Text?.Trim() ?? string.Empty;
-        double minimumConfidence = 0.5;
-
-        if (LandbConfidenceBox?.SelectedItem is ComboBoxItem item
-            && double.TryParse(Convert.ToString(item.Tag, CultureInfo.InvariantCulture), NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed))
-        {
-            minimumConfidence = parsed;
-        }
-
-        bool hideShort = LandbHideShortCheck?.IsChecked == true;
-
-        List<LandbTextCandidate> filtered = _currentArchive.Landb.TextCandidates
-            .Where(x => x.Confidence >= minimumConfidence)
-            .Where(x => !hideShort || x.Text.Trim().Length >= 4)
-            .Where(x => string.IsNullOrEmpty(search) || x.Text.Contains(search, StringComparison.CurrentCultureIgnoreCase))
-            .OrderBy(x => x.Offset)
+        List<ArchiveFileRow> filtered = _allFiles
+            .Where(file => !landbOnly || file.IsLandb)
+            .Where(file => string.IsNullOrEmpty(search)
+                || file.Name.Contains(search, StringComparison.CurrentCultureIgnoreCase)
+                || file.Index.ToString().Contains(search, StringComparison.Ordinal))
+            .OrderBy(file => file.Index)
             .ToList();
 
-        LandbCandidatesGrid.ItemsSource = filtered;
-        LandbSummaryText.Text = _currentArchive.Landb.LooksLikeLandb
-            ? $"LANDb: evet | güven {_currentArchive.Landb.Confidence:0.00} | gösterilen {filtered.Count:N0} / toplam {_currentArchive.Landb.TextCandidates.Count:N0}"
-            : $"LANDb doğrulanmadı | gösterilen {filtered.Count:N0} aday";
+        FilesGrid.ItemsSource = filtered;
+        UpdateButtonState();
     }
 
-    private void DisplayArchive(ArchiveModel archive)
+    private static List<ArchiveFileRow> BuildIndexedRows(
+        IReadOnlyCollection<ArchiveResourceEntry> resources,
+        string standardOutput)
     {
-        FileNameText.Text = archive.FileName;
-        FileSizeText.Text = $"{archive.FileSize:N0} bayt";
-        MagicText.Text = archive.Header.Magic;
-        EcttText.Text = archive.Ectt.LooksLikeEctt ? $"Evet (Güven: {archive.Ectt.Confidence:0.00})" : "Hayır";
-        ChunkCountText.Text = archive.Chunks.Count.ToString("N0");
-        SignatureCountText.Text = archive.Signatures.Count.ToString("N0");
-        Field0004Text.Text = $"0x{archive.Header.Field0004:X8}";
-        Field0008Text.Text = $"0x{archive.Header.Field0008:X8}";
-        Field000CText.Text = $"0x{archive.Header.Field000C:X8}";
-        OffsetTableText.Text = archive.Ectt.OffsetEntryCount > 0
-            ? $"0x{archive.Ectt.OffsetTableStart:X} - 0x{archive.Ectt.OffsetTableEnd:X} ({archive.Ectt.OffsetEntryCount:N0} giriş)"
-            : "Bulunamadı";
-        ChunksGrid.ItemsSource = archive.Chunks;
-        SignaturesGrid.ItemsSource = archive.Signatures;
-        ClearChunkPreview();
-        ApplyLandbFilter();
-        RefreshResourceCatalog();
+        Dictionary<string, ArchiveResourceEntry> remaining = resources
+            .GroupBy(resource => NormalizePath(resource.RelativePath), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        List<ArchiveResourceEntry> ordered = new(resources.Count);
+
+        foreach (string rawLine in standardOutput.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        {
+            string line = NormalizePath(rawLine.Trim());
+            if (line.Length == 0 || remaining.Count == 0)
+                continue;
+
+            string? matchedKey = remaining.Keys
+                .Where(key => line.EndsWith(key, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(key => key.Length)
+                .FirstOrDefault();
+
+            if (matchedKey is null)
+            {
+                List<string> basenameMatches = remaining.Keys
+                    .Where(key => line.EndsWith(Path.GetFileName(key), StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (basenameMatches.Count == 1)
+                    matchedKey = basenameMatches[0];
+            }
+
+            if (matchedKey is null)
+                continue;
+
+            ordered.Add(remaining[matchedKey]);
+            remaining.Remove(matchedKey);
+        }
+
+        ordered.AddRange(remaining.Values.OrderBy(resource => resource.RelativePath, StringComparer.OrdinalIgnoreCase));
+
+        return ordered.Select((resource, index) => new ArchiveFileRow
+        {
+            Index = index,
+            Name = resource.RelativePath,
+            RelativePath = resource.RelativePath,
+            ExtractedPath = resource.ExtractedPath,
+            Extension = resource.Extension,
+            Size = resource.Size,
+            State = "Orijinal"
+        }).ToList();
     }
 
-    private void ClearChunkPreview()
+    private string GetBackupPath(ArchiveFileRow selected)
     {
-        _selectedChunkType = null;
-        SelectedChunkTypeText.Text = "-";
-        HexPreviewText.Clear();
-        TextEditor.Clear();
-        TextEditor.IsEnabled = false;
-        TextPreviewInfo.Text = "Metin türünde bir chunk seçilmedi.";
-        TextByteCountInfo.Text = "UTF-8 boyutu: -";
+        string workRoot = Path.GetDirectoryName(_extractionRoot!)!;
+        return Path.Combine(workRoot, "backup", selected.RelativePath);
     }
 
-    private void SetBusy(bool isBusy, string message)
+    private static string NormalizePath(string value) => value.Replace('\\', '/').TrimStart('.', '/');
+
+    private void ResetArchiveState()
     {
-        IsEnabled = !isBusy;
+        _archivePath = null;
+        _extractionRoot = null;
+        _allFiles.Clear();
+        _modifiedFiles.Clear();
+        FilesGrid.ItemsSource = null;
+        ArchiveInfoText.Text = "Arşiv açılmadı";
+        UpdateButtonState();
+    }
+
+    private void SetBusy(bool busy, string message)
+    {
+        _isBusy = busy;
         StatusText.Text = message;
-        System.Windows.Input.Mouse.OverrideCursor = isBusy ? System.Windows.Input.Cursors.Wait : null;
+        BusyProgressBar.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+        FilesGrid.IsEnabled = !busy;
+        OpenArchiveButton.IsEnabled = !busy;
+        UpdateButtonState();
     }
 
-    private void Exit_Click(object sender, RoutedEventArgs e) => Close();
+    private void UpdateButtonState()
+    {
+        if (ExportTxtButton is null || ImportTxtButton is null || BuildArchiveButton is null)
+            return;
+
+        bool selectedLandb = FilesGrid?.SelectedItem is ArchiveFileRow row && row.IsLandb;
+        ExportTxtButton.IsEnabled = !_isBusy && selectedLandb;
+        ImportTxtButton.IsEnabled = !_isBusy && selectedLandb;
+        BuildArchiveButton.IsEnabled = !_isBusy && _archivePath is not null && _extractionRoot is not null;
+    }
 }
