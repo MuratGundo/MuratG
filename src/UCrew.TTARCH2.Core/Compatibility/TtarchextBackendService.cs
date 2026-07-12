@@ -9,6 +9,7 @@ public sealed class TtarchextBackendService
 {
     // ttarchext 0.3.2 game table index for Marvel's Guardians of the Galaxy.
     private const string GuardiansGameNumber = "62";
+    private const string GuardiansArchiveVersion = "7";
 
     public bool TryFindTool(out string toolPath)
     {
@@ -171,12 +172,12 @@ public sealed class TtarchextBackendService
         if (File.Exists(output))
             File.Delete(output);
 
-        // patchDirectory contains only modified resources. This creates a small overlay
-        // archive and never rebuilds or changes an original game TTARCH2 file.
-        // -x is the compatibility mode recommended by ttarchext for version 7/8 games.
+        // Guardians uses TTARCH2 version 7. Do not use -x: that flag forces the
+        // old archive format and the game silently ignores the resulting 0.ttarch.
         string arguments = string.Join(' ',
             "-b",
-            "-x",
+            "-V",
+            GuardiansArchiveVersion,
             GuardiansGameNumber,
             Quote(output),
             Quote(fullPatchDirectory));
@@ -192,9 +193,64 @@ public sealed class TtarchextBackendService
             result.Errors.Add(
                 $"0.ttarch yama oluşturma işlemi başarısız oldu (çıkış kodu {process.ExitCode}).\n" +
                 process.StandardError + Environment.NewLine + process.StandardOutput);
+            return result;
+        }
+
+        string magic = await ReadMagicAsync(output, token).ConfigureAwait(false);
+        if (!magic.Equals("NCTT", StringComparison.Ordinal) &&
+            !magic.Equals("zCTT", StringComparison.Ordinal))
+        {
+            try
+            {
+                File.Delete(output);
+            }
+            catch
+            {
+                // The validation error below is more important than cleanup failure.
+            }
+
+            result.Errors.Add(
+                $"Oluşturulan dosya Guardians uyumlu TTARCH2 değil. Başlık: {FormatMagic(magic)}. " +
+                "Beklenen başlık NCTT veya zCTT. ttarchext.exe sürümünü kontrol et.");
         }
 
         return result;
+    }
+
+    private static async Task<string> ReadMagicAsync(string path, CancellationToken token)
+    {
+        byte[] buffer = new byte[4];
+        await using FileStream stream = new(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 4096,
+            useAsync: true);
+
+        int totalRead = 0;
+        while (totalRead < buffer.Length)
+        {
+            int read = await stream
+                .ReadAsync(buffer.AsMemory(totalRead, buffer.Length - totalRead), token)
+                .ConfigureAwait(false);
+
+            if (read == 0)
+                break;
+
+            totalRead += read;
+        }
+
+        return Encoding.ASCII.GetString(buffer, 0, totalRead);
+    }
+
+    private static string FormatMagic(string magic)
+    {
+        if (string.IsNullOrEmpty(magic))
+            return "boş";
+
+        return string.Concat(magic.Select(character =>
+            char.IsControl(character) ? $"\\x{(int)character:X2}" : character.ToString()));
     }
 
     private static string GetWorkingDirectory(string archivePath)
