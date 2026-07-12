@@ -1,4 +1,4 @@
-name: Build Guardians WinMM ZIP Loader
+name: Build Guardians Version ZIP Loader
 
 on:
   workflow_dispatch:
@@ -19,13 +19,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Generate complete WinMM forwarders
-        shell: pwsh
-        run: |
-          & "tools/GuardiansWinMMZipLoader/GENERATE_WINMM_DEF.ps1"
-          Get-Content "tools/GuardiansWinMMZipLoader/winmm_exports.generated.def" |
-            Set-Content "guardians-winmm-exports.log"
-
       - name: Configure x64
         run: >
           cmake
@@ -37,30 +30,32 @@ jobs:
         shell: pwsh
         run: |
           cmake --build build/GuardiansWinMMZipLoader --config Release --verbose 2>&1 |
-            Tee-Object -FilePath guardians-winmm-build.log
+            Tee-Object -FilePath guardians-version-build.log
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
 
-      - name: Upload build logs
+      - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Guardians-WinMM-Build-Log
-          path: |
-            guardians-winmm-build.log
-            guardians-winmm-exports.log
+          name: Guardians-Version-Build-Log
+          path: guardians-version-build.log
           if-no-files-found: warn
 
       - name: Prepare package
         shell: pwsh
         run: |
-          $package = "package/Guardians_WinMM_ZIP_Loader"
+          $package = "package/Guardians_Version_ZIP_Loader"
           New-Item -ItemType Directory -Force -Path $package | Out-Null
 
           Copy-Item `
-            "build/GuardiansWinMMZipLoader/Release/winmm.dll" `
-            "$package/winmm.dll"
+            "build/GuardiansWinMMZipLoader/Release/version.dll" `
+            "$package/version.dll"
+
+          Copy-Item `
+            "build/GuardiansWinMMZipLoader/Release/ucrew_loader.dll" `
+            "$package/ucrew_loader.dll"
 
           Copy-Item `
             "tools/GuardiansWinMMZipLoader/ucrew_loader.ini" `
@@ -81,6 +76,6 @@ jobs:
       - name: Upload loader package
         uses: actions/upload-artifact@v4
         with:
-          name: Guardians-WinMM-ZIP-Loader-x64
-          path: package/Guardians_WinMM_ZIP_Loader
+          name: Guardians-Version-ZIP-Loader-x64
+          path: package/Guardians_Version_ZIP_Loader
           if-no-files-found: error
