@@ -19,6 +19,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Generate full WinMM exports
+        shell: pwsh
+        run: |
+          & "tools/GuardiansWinMMZipLoader/GENERATE_WINMM_DEF.ps1"
+          Get-Content "tools/GuardiansWinMMZipLoader/winmm_proxy.generated.def" |
+            Set-Content "guardians-winmm-exports.log"
+
       - name: Configure x64
         run: >
           cmake
@@ -35,12 +42,14 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Upload build log
+      - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Guardians-WinMM-Build-Log
-          path: guardians-winmm-build.log
+          path: |
+            guardians-winmm-build.log
+            guardians-winmm-exports.log
           if-no-files-found: warn
 
       - name: Prepare package
