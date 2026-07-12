@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.24)
 project(
     GuardiansWinMMZipLoader
     VERSION 0.1.1
-    LANGUAGES C CXX)
+    LANGUAGES C CXX ASM_MASM)
 
 if(NOT WIN32)
     message(FATAL_ERROR "Bu proje yalnızca Windows içindir.")
@@ -25,14 +25,27 @@ if(MSVC)
 endif()
 
 set(
-    WINMM_PROXY_DEF
-    "${CMAKE_CURRENT_SOURCE_DIR}/winmm_proxy.generated.def")
+    WINMM_FORWARDER_ASM
+    "${CMAKE_CURRENT_SOURCE_DIR}/winmm_forwarders.generated.asm")
 
-if(NOT EXISTS "${WINMM_PROXY_DEF}")
-    message(
-        FATAL_ERROR
-        "winmm_proxy.generated.def bulunamadı. Önce GENERATE_WINMM_DEF.ps1 çalıştırılmalıdır.")
-endif()
+set(
+    WINMM_EXPORT_DEF
+    "${CMAKE_CURRENT_SOURCE_DIR}/winmm_exports.generated.def")
+
+set(
+    WINMMBASE_IMPORT_LIB
+    "${CMAKE_CURRENT_SOURCE_DIR}/winmmbase_import.generated.lib")
+
+foreach(REQUIRED_FILE
+    "${WINMM_FORWARDER_ASM}"
+    "${WINMM_EXPORT_DEF}"
+    "${WINMMBASE_IMPORT_LIB}")
+    if(NOT EXISTS "${REQUIRED_FILE}")
+        message(
+            FATAL_ERROR
+            "${REQUIRED_FILE} bulunamadı. Önce GENERATE_WINMM_DEF.ps1 çalıştırılmalıdır.")
+    endif()
+endforeach()
 
 include(FetchContent)
 
@@ -91,7 +104,8 @@ add_library(
     guardians_winmm
     SHARED
     src/winmm_proxy.cpp
-    "${WINMM_PROXY_DEF}")
+    "${WINMM_FORWARDER_ASM}"
+    "${WINMM_EXPORT_DEF}")
 
 target_compile_definitions(
     guardians_winmm
@@ -112,7 +126,8 @@ target_link_libraries(
     guardians_winmm
     PRIVATE
         minhook
-        miniz)
+        miniz
+        "${WINMMBASE_IMPORT_LIB}")
 
 set_target_properties(
     guardians_winmm
