@@ -1,108 +1,198 @@
-param(
-    [string]$OutputPath = (Join-Path $PSScriptRoot "winmm_proxy.generated.def")
-)
+param()
 
 $ErrorActionPreference = "Stop"
 
-$DumpBinCandidates = @()
-$VisualStudioRoots = @(
-    (Join-Path $env:ProgramFiles "Microsoft Visual Studio"),
-    (Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio")
-) | Where-Object { $_ -and (Test-Path $_) }
+function Find-VCTool {
+    param([string]$FileName)
 
-foreach ($Root in $VisualStudioRoots) {
-    $DumpBinCandidates += Get-ChildItem `
-        -Path $Root `
-        -Filter dumpbin.exe `
-        -File `
-        -Recurse `
-        -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.FullName -match "Hostx64\\x64\\dumpbin\.exe$"
-        }
+    $Roots = @(
+        (Join-Path $env:ProgramFiles "Microsoft Visual Studio"),
+        (Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio")
+    ) | Where-Object { $_ -and (Test-Path $_) }
+
+    $Candidates = foreach ($Root in $Roots) {
+        Get-ChildItem `
+            -Path $Root `
+            -Filter $FileName `
+            -File `
+            -Recurse `
+            -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.FullName -match "Hostx64\\x64\\$([regex]::Escape($FileName))$"
+            }
+    }
+
+    return $Candidates |
+        Sort-Object FullName -Descending |
+        Select-Object -First 1
 }
 
-$DumpBin = $DumpBinCandidates |
-    Sort-Object FullName -Descending |
-    Select-Object -First 1
+function Get-ExportMap {
+    param(
+        [string]$DllPath,
+        [string]$DumpBinPath
+    )
+
+    $Map = @{}
+
+    $Lines = & $DumpBinPath /nologo /exports $DllPath 2>&1 |
+        ForEach-Object { $_.ToString() }
+
+    foreach ($Line in $Lines) {
+        if ($Line -notmatch '^\s*(?<ordinal>\d+)\s+(?<hint>[0-9A-Fa-f]+)\s+(?<rva>[0-9A-Fa-f]+)\s+(?<name>[^\s=]+)(?:\s+=\s+(?<target>\S+))?\s*$') {
+            continue
+        }
+
+        $Name = [string]$Matches.name
+
+        if ([string]::IsNullOrWhiteSpace($Name)) {
+            continue
+        }
+
+        $Map[$Name] = [pscustomobject]@{
+            Name = $Name
+            Ordinal = [int]$Matches.ordinal
+        }
+    }
+
+    return $Map
+}
+
+$DumpBin = Find-VCTool "dumpbin.exe"
+$LibTool = Find-VCTool "lib.exe"
 
 if (-not $DumpBin) {
     throw "dumpbin.exe bulunamadı. Visual Studio C++ araçları kurulu olmalı."
 }
 
-$RealWinMM = Join-Path $env:SystemRoot "System32\winmm.dll"
-
-if (-not (Test-Path $RealWinMM)) {
-    throw "Gerçek System32 winmm.dll bulunamadı: $RealWinMM"
+if (-not $LibTool) {
+    throw "lib.exe bulunamadı. Visual Studio C++ araçları kurulu olmalı."
 }
 
-$DumpLines = & $DumpBin.FullName /nologo /exports $RealWinMM 2>&1 |
-    ForEach-Object { $_.ToString() }
+$System32 = Join-Path $env:SystemRoot "System32"
+$WinMMPath = Join-Path $System32 "winmm.dll"
+$WinMMBasePath = Join-Path $System32 "winmmbase.dll"
 
-$ExcludedExports = @{
+if (-not (Test-Path $WinMMPath)) {
+    throw "System32 winmm.dll bulunamadı: $WinMMPath"
+}
+
+if (-not (Test-Path $WinMMBasePath)) {
+    throw "System32 winmmbase.dll bulunamadı: $WinMMBasePath"
+}
+
+$WinMMExports = Get-ExportMap $WinMMPath $DumpBin.FullName
+$WinMMBaseExports = Get-ExportMap $WinMMBasePath $DumpBin.FullName
+
+$Excluded = @{
     "timeBeginPeriod" = $true
     "timeEndPeriod" = $true
     "timeGetTime" = $true
 }
 
-$Exports = New-Object System.Collections.Generic.List[object]
-$FallbackCount = 0
+$Forwarders = New-Object System.Collections.Generic.List[object]
 
-foreach ($Line in $DumpLines) {
-    if ($Line -notmatch '^\s*(?<ordinal>\d+)\s+(?<hint>[0-9A-Fa-f]+)\s+(?<rva>[0-9A-Fa-f]+)\s+(?<name>[^\s=]+)(?:\s+=\s+(?<target>\S+))?\s*$') {
+foreach ($Name in $WinMMExports.Keys) {
+    if ($Excluded.ContainsKey($Name)) {
         continue
     }
 
-    $Ordinal = [int]$Matches.ordinal
-    $Name = [string]$Matches.name
-    $Target = [string]$Matches.target
-
-    if ([string]::IsNullOrWhiteSpace($Name)) {
+    if (-not $WinMMBaseExports.ContainsKey($Name)) {
         continue
     }
 
-    if ($ExcludedExports.ContainsKey($Name)) {
-        continue
-    }
-
-    if ([string]::IsNullOrWhiteSpace($Target)) {
-        # Modern Windows winmm.dll normalde WINMMBASE.dll'e yönlendirir.
-        # dumpbin bir hedef göstermiyorsa aynı adlı WINMMBASE dışa aktarımını kullan.
-        $Target = "WINMMBASE.$Name"
-        $FallbackCount++
-    }
-
-    $Exports.Add([pscustomobject]@{
-        Ordinal = $Ordinal
+    $Forwarders.Add([pscustomobject]@{
         Name = $Name
-        Target = $Target
+        Ordinal = $WinMMExports[$Name].Ordinal
     })
 }
 
-if ($Exports.Count -eq 0) {
-    throw "winmm.dll dışa aktarımları okunamadı."
+$Forwarders = @($Forwarders | Sort-Object Ordinal, Name)
+
+if ($Forwarders.Count -eq 0) {
+    throw "WinMM/WinMMBase ortak dışa aktarımları bulunamadı."
 }
 
-if (-not ($Exports.Name -contains "waveOutClose")) {
-    throw "waveOutClose dışa aktarımı oluşturulamadı."
+if (-not ($Forwarders.Name -contains "waveOutClose")) {
+    throw "waveOutClose WinMMBase içinde bulunamadı."
 }
 
-$Lines = New-Object System.Collections.Generic.List[string]
-$Lines.Add('LIBRARY "winmm"')
-$Lines.Add('')
-$Lines.Add('EXPORTS')
+$AsmPath = Join-Path $PSScriptRoot "winmm_forwarders.generated.asm"
+$ExportDefPath = Join-Path $PSScriptRoot "winmm_exports.generated.def"
+$ImportDefPath = Join-Path $PSScriptRoot "winmmbase_import.generated.def"
+$ImportLibPath = Join-Path $PSScriptRoot "winmmbase_import.generated.lib"
 
-foreach ($Export in ($Exports | Sort-Object Ordinal, Name)) {
-    $Lines.Add("    $($Export.Name)=$($Export.Target) @$($Export.Ordinal)")
+$Asm = New-Object System.Collections.Generic.List[string]
+$Asm.Add("option casemap:none")
+$Asm.Add("")
+
+foreach ($Export in $Forwarders) {
+    $Asm.Add("EXTERN __imp_$($Export.Name):QWORD")
 }
+
+$Asm.Add("")
+$Asm.Add(".code")
+$Asm.Add("")
+
+foreach ($Export in $Forwarders) {
+    $Asm.Add("$($Export.Name) PROC")
+    $Asm.Add("    jmp QWORD PTR [__imp_$($Export.Name)]")
+    $Asm.Add("$($Export.Name) ENDP")
+    $Asm.Add("")
+}
+
+$Asm.Add("END")
 
 [System.IO.File]::WriteAllLines(
-    [System.IO.Path]::GetFullPath($OutputPath),
-    $Lines,
+    $AsmPath,
+    $Asm,
     [System.Text.Encoding]::ASCII
 )
 
-Write-Host "WinMM proxy DEF oluşturuldu: $OutputPath"
-Write-Host "Yönlendirilen dışa aktarım sayısı: $($Exports.Count)"
-Write-Host "WINMMBASE varsayımı kullanılan satır: $FallbackCount"
+$ExportDef = New-Object System.Collections.Generic.List[string]
+$ExportDef.Add('LIBRARY "winmm"')
+$ExportDef.Add("")
+$ExportDef.Add("EXPORTS")
+
+foreach ($Export in $Forwarders) {
+    $ExportDef.Add("    $($Export.Name) @$($Export.Ordinal)")
+}
+
+[System.IO.File]::WriteAllLines(
+    $ExportDefPath,
+    $ExportDef,
+    [System.Text.Encoding]::ASCII
+)
+
+$ImportDef = New-Object System.Collections.Generic.List[string]
+$ImportDef.Add('LIBRARY "WINMMBASE.dll"')
+$ImportDef.Add("")
+$ImportDef.Add("EXPORTS")
+
+foreach ($Export in $Forwarders) {
+    $ImportDef.Add("    $($Export.Name)")
+}
+
+[System.IO.File]::WriteAllLines(
+    $ImportDefPath,
+    $ImportDef,
+    [System.Text.Encoding]::ASCII
+)
+
+& $LibTool.FullName `
+    /nologo `
+    "/def:$ImportDefPath" `
+    /machine:x64 `
+    "/out:$ImportLibPath"
+
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $ImportLibPath)) {
+    throw "WinMMBase import kütüphanesi oluşturulamadı."
+}
+
+Write-Host "WinMM proxy dosyaları oluşturuldu."
+Write-Host "Ortak yönlendirme sayısı: $($Forwarders.Count)"
+Write-Host "waveOutClose: hazır"
+Write-Host "ASM: $AsmPath"
+Write-Host "Export DEF: $ExportDefPath"
+Write-Host "Import LIB: $ImportLibPath"
 Write-Host "Yerel C++ işlevleri: timeBeginPeriod, timeEndPeriod, timeGetTime"
