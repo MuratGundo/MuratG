@@ -1,0 +1,46 @@
+GUARDIANS WINMM ZIP LOADER — KURULUM VE TEST
+
+GEREKLİ DOSYALAR
+- winmm.dll
+- ucrew_loader.ini
+- UCREW_Guardians_TR.zip
+
+KURULUM
+Bu üç dosyayı Guardians.exe dosyasının bulunduğu ana oyun klasörüne koy.
+
+Örnek:
+Guardians of the Galaxy\
+  Guardians.exe
+  winmm.dll
+  ucrew_loader.ini
+  UCREW_Guardians_TR.zip
+
+ÖNEMLİ
+- Oyun klasöründe daha önce başka bir winmm.dll varsa önce yedekle.
+- _resdesc_50_Menu.lua orijinal durumda olsun.
+- Özel 0.ttarch, 0.ttarch2 veya GoG_pc_UCREW_TR.ttarch2 kalmasın.
+- İlk testte ZIP'e yalnızca gevşek olarak çalıştığı doğrulanmış bir LANDb koy.
+
+ZIP HAZIRLAMA
+UCREW_GUARDIANS_ZIP_HAZIRLA.bat dosyasını çalıştır.
+Çevrilmiş dosya klasörünü seç.
+UCREW_Guardians_TR.zip dosyasını oyun klasörüne kaydet.
+
+TEST
+1. Oyunu tamamen kapat.
+2. Guardians.exe ile yeniden aç.
+3. Oyun klasöründe ucrew_winmm.log oluşmalı.
+4. Log içinde şu satırlar beklenir:
+   ZIP hazırlandı.
+   Hooklar etkin.
+   U-CREW ZIP yönlendirmesi hazır.
+
+GERİ ALMA
+Oyun klasöründen şunları sil:
+- winmm.dll
+- ucrew_loader.ini
+- UCREW_Guardians_TR.zip
+- ucrew_winmm.log
+
+Önbellek:
+%LOCALAPPDATA%\UCREW\Guardians\Cache

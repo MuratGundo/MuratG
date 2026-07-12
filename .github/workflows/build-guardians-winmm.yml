@@ -1,0 +1,77 @@
+name: Build Guardians WinMM ZIP Loader
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-guardians-winmm.yml"
+      - "tools/GuardiansWinMMZipLoader/**"
+  pull_request:
+    paths:
+      - ".github/workflows/build-guardians-winmm.yml"
+      - "tools/GuardiansWinMMZipLoader/**"
+
+jobs:
+  build-x64:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure x64
+        run: >
+          cmake
+          -S tools/GuardiansWinMMZipLoader
+          -B build/GuardiansWinMMZipLoader
+          -A x64
+
+      - name: Build Release
+        shell: pwsh
+        run: |
+          cmake --build build/GuardiansWinMMZipLoader --config Release --verbose 2>&1 |
+            Tee-Object -FilePath guardians-winmm-build.log
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Guardians-WinMM-Build-Log
+          path: guardians-winmm-build.log
+          if-no-files-found: warn
+
+      - name: Prepare package
+        shell: pwsh
+        run: |
+          $package = "package/Guardians_WinMM_ZIP_Loader"
+          New-Item -ItemType Directory -Force -Path $package | Out-Null
+
+          Copy-Item `
+            "build/GuardiansWinMMZipLoader/Release/winmm.dll" `
+            "$package/winmm.dll"
+
+          Copy-Item `
+            "tools/GuardiansWinMMZipLoader/ucrew_loader.ini" `
+            "$package/ucrew_loader.ini"
+
+          Copy-Item `
+            "tools/GuardiansWinMMZipLoader/UCREW_GUARDIANS_ZIP_HAZIRLA.ps1" `
+            "$package/UCREW_GUARDIANS_ZIP_HAZIRLA.ps1"
+
+          Copy-Item `
+            "tools/GuardiansWinMMZipLoader/UCREW_GUARDIANS_ZIP_HAZIRLA.bat" `
+            "$package/UCREW_GUARDIANS_ZIP_HAZIRLA.bat"
+
+          Copy-Item `
+            "tools/GuardiansWinMMZipLoader/KURULUM_VE_TEST.txt" `
+            "$package/KURULUM_VE_TEST.txt"
+
+      - name: Upload loader package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Guardians-WinMM-ZIP-Loader-x64
+          path: package/Guardians_WinMM_ZIP_Loader
+          if-no-files-found: error
