@@ -1,5 +1,4 @@
 using System.Windows;
-using Forms = System.Windows.Forms;
 using Microsoft.Win32;
 using UCrew.TTARCH2.Core.Compatibility;
 
@@ -18,20 +17,19 @@ public partial class MainWindow
 
     private async void BuildFromFolder_Click(object sender, RoutedEventArgs e)
     {
-        using Forms.FolderBrowserDialog folderDialog = new()
+        OpenFolderDialog folderDialog = new()
         {
-            Description = "LANDb ve font dosyalarının bulunduğu klasörü seç",
-            UseDescriptionForTitle = true,
-            ShowNewFolderButton = false
+            Title = "LANDb ve font dosyalarının bulunduğu klasörü seç",
+            Multiselect = false
         };
 
-        if (folderDialog.ShowDialog() != Forms.DialogResult.OK ||
-            string.IsNullOrWhiteSpace(folderDialog.SelectedPath))
+        if (folderDialog.ShowDialog(this) != true ||
+            string.IsNullOrWhiteSpace(folderDialog.FolderName))
         {
             return;
         }
 
-        string sourceFolder = Path.GetFullPath(folderDialog.SelectedPath);
+        string sourceFolder = Path.GetFullPath(folderDialog.FolderName);
         string[] sourceFiles;
 
         try
