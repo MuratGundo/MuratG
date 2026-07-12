@@ -19,10 +19,26 @@ public sealed class LandbVariableLengthPlannerTests
         archive.Landb.TextCandidates.Add(new LandbTextCandidate { Offset = 40, ByteLength = 5, Text = "World" });
         archive.Pointers.Add(new PointerHit { SourceOffset = 4, TargetOffset = 20, IsValid = true });
         archive.Pointers.Add(new PointerHit { SourceOffset = 8, TargetOffset = 40, IsValid = true });
+        archive.Landb.LengthFieldCandidates.Add(new LandbLengthFieldCandidate
+        {
+            TextIndex = 0,
+            FieldOffset = 12,
+            FieldSize = 2,
+            StoredValue = 5,
+            Confidence = 0.95
+        });
+        archive.Landb.LengthFieldCandidates.Add(new LandbLengthFieldCandidate
+        {
+            TextIndex = 1,
+            FieldOffset = 14,
+            FieldSize = 2,
+            StoredValue = 5,
+            Confidence = 0.95
+        });
 
         LandbRebuildPlan plan = await new LandbVariableLengthPlanner().CreatePlanAsync(archive, translated);
 
-        Assert.True(plan.CanRebuild);
+        Assert.True(plan.CanRebuild, string.Join(Environment.NewLine, plan.Errors));
         Assert.Equal(98, plan.PlannedFileSize);
         Assert.Equal(20, plan.Entries[0].NewOffset);
         Assert.Equal(41, plan.Entries[1].NewOffset);
