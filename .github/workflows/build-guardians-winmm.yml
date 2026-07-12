@@ -19,11 +19,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Generate full WinMM exports
+      - name: Generate complete WinMM forwarders
         shell: pwsh
         run: |
           & "tools/GuardiansWinMMZipLoader/GENERATE_WINMM_DEF.ps1"
-          Get-Content "tools/GuardiansWinMMZipLoader/winmm_proxy.generated.def" |
+          Get-Content "tools/GuardiansWinMMZipLoader/winmm_exports.generated.def" |
             Set-Content "guardians-winmm-exports.log"
 
       - name: Configure x64
