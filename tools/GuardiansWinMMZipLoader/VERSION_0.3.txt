@@ -1,0 +1,5 @@
+Guardians ZIP Loader v0.3
+- CreateFileA/W ve CreateFile2
+- GetFileAttributes A/W ve Ex A/W
+- FindFirstFile A/W ve Ex A/W
+- Yönlendirme ve kaçırılan kaynak tanılama günlüğü
