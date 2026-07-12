@@ -1,9 +1,9 @@
 <Window x:Class="UCrew.TTARCH2.GUI.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="U-CREW TTARCH2 Paketleme Aracı"
-        Height="720" Width="1120"
-        MinHeight="620" MinWidth="900"
+        Title="U-CREW Guardians Tek Yama Aracı"
+        Height="720" Width="1240"
+        MinHeight="620" MinWidth="980"
         WindowStartupLocation="CenterScreen">
     <Grid Background="#F4F6F8">
         <Grid.RowDefinitions>
@@ -17,9 +17,9 @@
         <Border Grid.Row="0" Background="#17212B" Padding="20,16">
             <DockPanel>
                 <StackPanel>
-                    <TextBlock Text="U-CREW TTARCH2 Paketleme Aracı"
+                    <TextBlock Text="U-CREW Guardians Tek Yama Aracı"
                                Foreground="White" FontSize="22" FontWeight="SemiBold" />
-                    <TextBlock Text="Guardians TTARCH2 → LANDb → Temiz TXT → LANDb → TTARCH2"
+                    <TextBlock Text="LANDb + Font + değiştirilmiş kaynaklar → tek 0.ttarch"
                                Foreground="#B8C5D1" Margin="0,4,0,0" />
                 </StackPanel>
                 <TextBlock x:Name="ArchiveInfoText" DockPanel.Dock="Right"
@@ -30,15 +30,17 @@
 
         <Border Grid.Row="1" Margin="16,16,16,10" Padding="12"
                 Background="White" BorderBrush="#D6DCE2" BorderThickness="1" CornerRadius="6">
-            <UniformGrid Columns="4">
+            <UniformGrid Columns="5">
                 <Button x:Name="OpenArchiveButton" Content="1) TTARCH2 Aç"
                         Margin="5" Padding="12,10" Click="OpenArchive_Click" />
                 <Button x:Name="ExportTxtButton" Content="2) Temiz TXT Çıkar"
                         Margin="5" Padding="12,10" Click="ExportTxt_Click" IsEnabled="False" />
                 <Button x:Name="ImportTxtButton" Content="3) TXT İçe Aktar"
                         Margin="5" Padding="12,10" Click="ImportTxt_Click" IsEnabled="False" />
-                <Button x:Name="BuildArchiveButton" Content="4) Yeni TTARCH2 Oluştur"
-                        Margin="5" Padding="12,10" Click="BuildArchive_Click" IsEnabled="False" />
+                <Button x:Name="AddResourceButton" Content="4) Font/Dosya Ekle"
+                        Margin="5" Padding="12,10" Click="AddResource_Click" IsEnabled="False" />
+                <Button x:Name="BuildPatchButton" Content="5) Tek 0.ttarch Oluştur"
+                        Margin="5" Padding="12,10" Click="BuildPatch_Click" IsEnabled="False" />
             </UniformGrid>
         </Border>
 
@@ -71,7 +73,7 @@
                     <DataGridTextColumn Header="Dosya Adı" Binding="{Binding Name}" Width="*" />
                     <DataGridTextColumn Header="Tür" Binding="{Binding Extension}" Width="100" />
                     <DataGridTextColumn Header="Boyut" Binding="{Binding Size, StringFormat={}{0:N0}}" Width="130" />
-                    <DataGridTextColumn Header="Durum" Binding="{Binding State}" Width="130" />
+                    <DataGridTextColumn Header="Durum" Binding="{Binding State}" Width="150" />
                 </DataGrid.Columns>
             </DataGrid>
         </Border>
