@@ -2,8 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="U-CREW Guardians Tek Yama Aracı"
-        Height="720" Width="1240"
-        MinHeight="620" MinWidth="980"
+        Height="760" Width="1240"
+        MinHeight="650" MinWidth="980"
         WindowStartupLocation="CenterScreen">
     <Grid Background="#F4F6F8">
         <Grid.RowDefinitions>
@@ -30,18 +30,29 @@
 
         <Border Grid.Row="1" Margin="16,16,16,10" Padding="12"
                 Background="White" BorderBrush="#D6DCE2" BorderThickness="1" CornerRadius="6">
-            <UniformGrid Columns="5">
-                <Button x:Name="OpenArchiveButton" Content="1) TTARCH2 Aç"
-                        Margin="5" Padding="12,10" Click="OpenArchive_Click" />
-                <Button x:Name="ExportTxtButton" Content="2) Temiz TXT Çıkar"
-                        Margin="5" Padding="12,10" Click="ExportTxt_Click" IsEnabled="False" />
-                <Button x:Name="ImportTxtButton" Content="3) TXT İçe Aktar"
-                        Margin="5" Padding="12,10" Click="ImportTxt_Click" IsEnabled="False" />
-                <Button x:Name="AddResourceButton" Content="4) Font/Dosya Ekle"
-                        Margin="5" Padding="12,10" Click="AddResource_Click" IsEnabled="False" />
-                <Button x:Name="BuildPatchButton" Content="5) Tek 0.ttarch Oluştur"
-                        Margin="5" Padding="12,10" Click="BuildPatch_Click" IsEnabled="False" />
-            </UniformGrid>
+            <StackPanel>
+                <Button x:Name="BuildFolderPatchButton"
+                        Content="HIZLI: Klasör Seç → Tek 0.ttarch Oluştur"
+                        Margin="5" Padding="16,12"
+                        Background="#1F7A4D" Foreground="White"
+                        FontSize="15" FontWeight="SemiBold"
+                        Click="BuildFromFolder_Click" />
+                <TextBlock Text="Klasördeki LANDb ve font dosyaları alt klasörleriyle birlikte alınır; TXT ve yedek dosyaları dahil edilmez."
+                           Margin="8,2,8,10" Foreground="#4D5965" TextAlignment="Center" />
+
+                <UniformGrid Columns="5">
+                    <Button x:Name="OpenArchiveButton" Content="1) TTARCH2 Aç"
+                            Margin="5" Padding="12,10" Click="OpenArchive_Click" />
+                    <Button x:Name="ExportTxtButton" Content="2) Temiz TXT Çıkar"
+                            Margin="5" Padding="12,10" Click="ExportTxt_Click" IsEnabled="False" />
+                    <Button x:Name="ImportTxtButton" Content="3) TXT İçe Aktar"
+                            Margin="5" Padding="12,10" Click="ImportTxt_Click" IsEnabled="False" />
+                    <Button x:Name="AddResourceButton" Content="4) Font/Dosya Ekle"
+                            Margin="5" Padding="12,10" Click="AddResource_Click" IsEnabled="False" />
+                    <Button x:Name="BuildPatchButton" Content="5) Tek 0.ttarch Oluştur"
+                            Margin="5" Padding="12,10" Click="BuildPatch_Click" IsEnabled="False" />
+                </UniformGrid>
+            </StackPanel>
         </Border>
 
         <Border Grid.Row="2" Margin="16,0,16,10" Padding="10"
