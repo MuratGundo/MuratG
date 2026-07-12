@@ -8,8 +8,6 @@ namespace UCrew.TTARCH2.Core.Compatibility;
 public sealed class TtarchextBackendService
 {
     // ttarchext 0.3.2 game table index for Marvel's Guardians of the Galaxy.
-    // Using -k 476f7447 ("GotG") is not equivalent to the built-in 55-byte key
-    // used by ttarchext and causes encrypted chunks to fail during deflate decode.
     private const string GuardiansGameNumber = "62";
 
     public bool TryFindTool(out string toolPath)
@@ -90,7 +88,7 @@ public sealed class TtarchextBackendService
             string combined = process.StandardError + Environment.NewLine + process.StandardOutput;
             string hint = combined.Contains("zlib/deflate", StringComparison.OrdinalIgnoreCase)
                 ? Environment.NewLine + Environment.NewLine +
-                  "Arşiv, bu ttarchext sürümünün desteklemediği Oodle sıkıştırması kullanıyor olabilir veya dosya bozuk olabilir."
+                  "Arşiv bu ttarchext sürümünün desteklemediği bir sıkıştırma kullanıyor olabilir veya dosya bozuk olabilir."
                 : string.Empty;
 
             result.Errors.Add(
@@ -107,7 +105,6 @@ public sealed class TtarchextBackendService
 
             FileInfo info = new(file);
             string relative = Path.GetRelativePath(extractionDirectory, file);
-            string extension = info.Extension;
 
             result.Resources.Add(new ArchiveResourceEntry
             {
@@ -116,7 +113,7 @@ public sealed class TtarchextBackendService
                 RelativePath = relative,
                 ExtractedPath = info.FullName,
                 ExtractionRoot = extractionDirectory,
-                Extension = extension,
+                Extension = info.Extension,
                 Offset = -1,
                 Size = info.Length,
                 Confidence = 1.0,
@@ -130,16 +127,29 @@ public sealed class TtarchextBackendService
         return result;
     }
 
-    public async Task<TtarchextBackendResult> RebuildGuardiansArchiveAsync(
-        string extractedDirectory,
+    public async Task<TtarchextBackendResult> BuildGuardiansPatchArchiveAsync(
+        string patchDirectory,
         string outputArchivePath,
-        string sourceArchivePath,
         CancellationToken token = default)
     {
+        string fullPatchDirectory = Path.GetFullPath(patchDirectory);
         TtarchextBackendResult result = new()
         {
-            WorkingDirectory = Path.GetFullPath(extractedDirectory)
+            WorkingDirectory = fullPatchDirectory
         };
+
+        if (!Directory.Exists(fullPatchDirectory))
+        {
+            result.Errors.Add("Yama çalışma klasörü bulunamadı.");
+            return result;
+        }
+
+        string[] patchFiles = Directory.GetFiles(fullPatchDirectory, "*", SearchOption.AllDirectories);
+        if (patchFiles.Length == 0)
+        {
+            result.Errors.Add("Yamaya eklenmiş LANDb, font veya başka kaynak dosyası bulunamadı.");
+            return result;
+        }
 
         if (!TryFindTool(out string toolPath))
         {
@@ -149,7 +159,7 @@ public sealed class TtarchextBackendService
 
         result = new TtarchextBackendResult
         {
-            WorkingDirectory = Path.GetFullPath(extractedDirectory),
+            WorkingDirectory = fullPatchDirectory,
             ToolPath = toolPath
         };
 
@@ -161,13 +171,15 @@ public sealed class TtarchextBackendService
         if (File.Exists(output))
             File.Delete(output);
 
-        // Stock ttarchext 0.3.2 does not support the custom -z Oodle rebuild switch.
-        // Build a normal/uncompressed TTARCH2 using the built-in Guardians profile.
+        // patchDirectory contains only modified resources. This creates a small overlay
+        // archive and never rebuilds or changes an original game TTARCH2 file.
+        // -x is the compatibility mode recommended by ttarchext for version 7/8 games.
         string arguments = string.Join(' ',
             "-b",
+            "-x",
             GuardiansGameNumber,
             Quote(output),
-            Quote(Path.GetFullPath(extractedDirectory)));
+            Quote(fullPatchDirectory));
 
         ProcessRunResult process = await RunAsync(toolPath, arguments, Path.GetDirectoryName(toolPath)!, token)
             .ConfigureAwait(false);
@@ -175,10 +187,11 @@ public sealed class TtarchextBackendService
         result.StandardOutput = process.StandardOutput;
         result.StandardError = process.StandardError;
 
-        if (process.ExitCode != 0 || !File.Exists(output))
+        if (process.ExitCode != 0 || !File.Exists(output) || new FileInfo(output).Length == 0)
         {
             result.Errors.Add(
-                $"ttarchext rebuild işlemi başarısız oldu (çıkış kodu {process.ExitCode}).\n{process.StandardError}\n{process.StandardOutput}");
+                $"0.ttarch yama oluşturma işlemi başarısız oldu (çıkış kodu {process.ExitCode}).\n" +
+                process.StandardError + Environment.NewLine + process.StandardOutput);
         }
 
         return result;
