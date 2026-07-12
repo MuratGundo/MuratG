@@ -5,10 +5,13 @@ title Guardians WinMM ZIP Loader Build
 where cmake >nul 2>nul
 if errorlevel 1 (
     echo HATA: CMake bulunamadi.
-    echo Visual Studio 2022 C++ ve CMake bilesenlerini kur.
+    echo Visual Studio C++ ve CMake bilesenlerini kur.
     pause
     exit /b 1
 )
+
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0GENERATE_WINMM_DEF.ps1"
+if errorlevel 1 goto :error
 
 cmake -S "%~dp0" -B "%~dp0build" -A x64
 if errorlevel 1 goto :error

@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(
-    GuardiansWinMMZipLoader
-    VERSION 0.1.0
+    GuardiansVersionZipLoader
+    VERSION 0.2.0
     LANGUAGES C CXX)
 
 if(NOT WIN32)
@@ -78,13 +78,12 @@ add_subdirectory(
     EXCLUDE_FROM_ALL)
 
 add_library(
-    guardians_winmm
+    ucrew_loader
     SHARED
-    src/winmm_proxy.cpp
-    winmm_proxy.def)
+    src/winmm_proxy.cpp)
 
 target_compile_definitions(
-    guardians_winmm
+    ucrew_loader
     PRIVATE
         UNICODE
         _UNICODE
@@ -92,24 +91,53 @@ target_compile_definitions(
         NOMINMAX)
 
 target_compile_options(
-    guardians_winmm
+    ucrew_loader
     PRIVATE
         /W4
         /EHsc
         /utf-8)
 
 target_link_libraries(
-    guardians_winmm
+    ucrew_loader
     PRIVATE
         minhook
         miniz)
 
 set_target_properties(
-    guardians_winmm
+    ucrew_loader
     PROPERTIES
-        OUTPUT_NAME "winmm"
+        OUTPUT_NAME "ucrew_loader"
+        PREFIX "")
+
+add_library(
+    version_proxy
+    SHARED
+    src/version_proxy_min.cpp
+    version_proxy.def)
+
+target_compile_definitions(
+    version_proxy
+    PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX)
+
+target_compile_options(
+    version_proxy
+    PRIVATE
+        /W4
+        /EHsc
+        /utf-8)
+
+set_target_properties(
+    version_proxy
+    PROPERTIES
+        OUTPUT_NAME "version"
         PREFIX "")
 
 install(
-    TARGETS guardians_winmm
+    TARGETS
+        ucrew_loader
+        version_proxy
     RUNTIME DESTINATION .)
