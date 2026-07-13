@@ -391,8 +391,16 @@ internal sealed class LauncherEngine
 
     private void WriteManifest(IEnumerable<string> names)
     {
-        File.WriteAllLines(_manifestPath, names, new UTF8Encoding(false));
+        Directory.CreateDirectory(_privateRoot);
+        RemoveRestrictiveAttributes(_manifestPath);
+
+        File.WriteAllLines(
+            _manifestPath,
+            names,
+            new UTF8Encoding(false));
+
         SetHiddenSystem(_manifestPath);
+        SetHiddenSystem(_privateRoot);
     }
 
     private static void SetHiddenSystem(string path)
@@ -427,6 +435,8 @@ internal sealed class LauncherEngine
         try
         {
             Directory.CreateDirectory(_privateRoot);
+            RemoveRestrictiveAttributes(_logPath);
+
             string line =
                 $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}";
 
