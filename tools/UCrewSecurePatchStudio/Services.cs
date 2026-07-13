@@ -710,6 +710,8 @@ internal sealed class ServerDeploymentService
                 Upload(sftp, Path.Combine(localRoot, "INSTALL_VPS.sh"), remoteRoot + "/INSTALL_VPS.sh");
                 Upload(sftp, Path.Combine(localRoot, "api", "secure_patch_request.php"), remoteRoot + "/api/secure_patch_request.php");
                 Upload(sftp, Path.Combine(localRoot, "api", "secure_patch_download.php"), remoteRoot + "/api/secure_patch_download.php");
+                Upload(sftp, Path.Combine(localRoot, "api", "auth_v2.php"), remoteRoot + "/api/auth_v2.php");
+                Upload(sftp, Path.Combine(localRoot, "api", "login.php"), remoteRoot + "/api/login.php");
                 Upload(sftp, Path.Combine(localRoot, "database", "INSTALL_SCHEMA.sql"), remoteRoot + "/database/INSTALL_SCHEMA.sql");
                 progress?.Report(35);
 
@@ -772,6 +774,8 @@ internal sealed class ServerDeploymentService
         {
             ["ServerPayload.api.secure_patch_request.php"] = Path.Combine(root, "api", "secure_patch_request.php"),
             ["ServerPayload.api.secure_patch_download.php"] = Path.Combine(root, "api", "secure_patch_download.php"),
+            ["ServerPayload.api.auth_v2.php"] = Path.Combine(root, "api", "auth_v2.php"),
+            ["ServerPayload.api.login.php"] = Path.Combine(root, "api", "login.php"),
             ["ServerPayload.database.INSTALL_SCHEMA.sql"] = Path.Combine(root, "database", "INSTALL_SCHEMA.sql"),
             ["ServerPayload.INSTALL_VPS.sh"] = Path.Combine(root, "INSTALL_VPS.sh")
         };
