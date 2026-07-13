@@ -2,7 +2,7 @@
 chcp 65001 >nul
 title U-CREW Genel Guvenli Yama Hazirlayici
 
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0UCREW_SECURE_PATCH_PACK.ps1"
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0UCREW_SECURE_PATCH_PACK_PS51.ps1"
 set "EXITCODE=%ERRORLEVEL%"
 
 echo.
