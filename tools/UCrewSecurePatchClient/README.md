@@ -28,3 +28,5 @@ Bu istemci tek bir oyuna özel değildir. `ucrew_game.json` dosyasındaki `GameS
 - İsteğe bağlı oyun logosu ve arka plan görseli
 
 İstemci günlükleri `%LOCALAPPDATA%\U-CREW\SecurePatch\<game_slug>\client.log` konumundadır.
+
+Bu ilk genel sürüm Windows 11, .NET 8 ve win-x64 hedefiyle tek EXE olarak yayımlanır.
