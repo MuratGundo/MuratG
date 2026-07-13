@@ -24,6 +24,7 @@ jobs:
         run: |
           $scripts = @(
             "server/UCrewSecurePatch/tools/UCREW_SECURE_PATCH_PACK_PS51.ps1",
+            "server/UCrewSecurePatch/tools/UCREW_SECURE_PATCH_PUBLISH.ps1",
             "server/UCrewSecurePatch/DEPLOY_FROM_WINDOWS.ps1"
           )
 
@@ -70,6 +71,8 @@ jobs:
           cp server/UCrewSecurePatch/database/INSTALL_SCHEMA.sql "$package/database/"
           cp server/UCrewSecurePatch/tools/UCREW_SECURE_PATCH_PACK_PS51.ps1 "$package/tools/"
           cp server/UCrewSecurePatch/tools/UCREW_SECURE_PATCH_PACK.bat "$package/tools/"
+          cp server/UCrewSecurePatch/tools/UCREW_SECURE_PATCH_PUBLISH.ps1 "$package/tools/"
+          cp server/UCrewSecurePatch/tools/UCREW_SECURE_PATCH_PUBLISH.bat "$package/tools/"
           cp server/UCrewSecurePatch/profiles/profile.schema.json "$package/profiles/"
           cp server/UCrewSecurePatch/profiles/guardians.json "$package/profiles/"
           cp server/UCrewSecurePatch/INSTALL_VPS.sh "$package/"
