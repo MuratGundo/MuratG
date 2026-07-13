@@ -18,6 +18,32 @@ internal static class TokenProvider
         "AccessToken"
     };
 
+    public static bool TryUseSavedSecurePatchSession()
+    {
+        string path = GetSessionPath();
+        if (!File.Exists(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path, Encoding.UTF8));
+            string token = FindToken(document.RootElement);
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return false;
+            }
+
+            _runtimeToken = token.Trim();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static void SetRuntimeToken(string token, bool remember)
     {
         _runtimeToken = token?.Trim() ?? string.Empty;
