@@ -8,7 +8,6 @@ internal sealed record LauncherProgress(int Percent, string Status, string Detai
 
 internal sealed class LauncherEngine
 {
-    private const string PatchZipName = "UCREW_Guardians_TR.zip";
     private const string GameExeName = "Guardians.exe";
     private const string LogoFileName = "ucrew-logo.png";
     private const string BackgroundFileName = "guardians-background.jpg";
@@ -29,12 +28,12 @@ internal sealed class LauncherEngine
     private readonly string _privateRoot;
     private readonly string _assetsRoot;
     private readonly string _archivesRoot;
-    private readonly string _hiddenZipPath;
     private readonly string _manifestPath;
     private readonly string _backupRoot;
     private readonly string _logPath;
     private readonly string _logoPath;
     private readonly string _backgroundPath;
+    private readonly SecurePatchClient _securePatchClient;
 
     public LauncherEngine(IReadOnlyList<string> arguments)
     {
@@ -43,7 +42,6 @@ internal sealed class LauncherEngine
         _privateRoot = Path.Combine(_gameRoot, ".ucrew");
         _assetsRoot = Path.Combine(_privateRoot, "assets");
         _archivesRoot = Path.Combine(_gameRoot, "archives");
-        _hiddenZipPath = Path.Combine(_privateRoot, PatchZipName);
         _manifestPath = Path.Combine(_privateRoot, "runtime_manifest.txt");
         _backupRoot = Path.Combine(_privateRoot, "runtime_backup");
         _logPath = Path.Combine(_privateRoot, "ucrew_launcher.log");
@@ -52,19 +50,24 @@ internal sealed class LauncherEngine
 
         PreparePrivateStorage();
         ImportVisualAssets();
+
+        _securePatchClient = new SecurePatchClient(
+            _gameRoot,
+            _privateRoot,
+            Log);
     }
 
     public string LogoPath => _logoPath;
     public string BackgroundPath => _backgroundPath;
 
-    public void PreparePatch(
+    public async Task PreparePatchAsync(
         IProgress<LauncherProgress> progress,
         CancellationToken cancellationToken)
     {
         progress.Report(new LauncherProgress(
-            5,
+            3,
             "Yama hazırlanıyor…",
-            "Gerekli dosyalar kontrol ediliyor."));
+            "Guardians kurulumu ve gizli çalışma alanı kontrol ediliyor."));
 
         string gameExePath = Path.Combine(_gameRoot, GameExeName);
         if (!File.Exists(gameExePath))
@@ -76,21 +79,32 @@ internal sealed class LauncherEngine
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        ImportPatchZip();
         MoveLegacyFilesOutOfSight();
         CleanupStaleSession();
 
+        using SecurePatchPackage package =
+            await _securePatchClient.AcquireAsync(
+                progress,
+                cancellationToken).ConfigureAwait(false);
+
         progress.Report(new LauncherProgress(
-            18,
+            72,
             "Türkçe yama kuruluyor…",
-            "Dil ve yazı tipi dosyaları hazırlanıyor."));
+            $"Sunucudan doğrulanan {package.Version} sürümü hazırlanıyor."));
 
-        ExtractPatchIntoArchives(progress, cancellationToken);
+        ExtractPatchIntoArchives(
+            package.ZipPath,
+            progress,
+            cancellationToken);
 
         progress.Report(new LauncherProgress(
-            92,
+            94,
             "Yama kuruldu.",
             "Galaksinin Koruyucuları Türkçe olarak başlatılmaya hazır."));
+
+        Log(
+            $"Sunucu yaması hazırlandı. Sürüm={package.Version} " +
+            $"Yeniİndirme={(package.Downloaded ? "evet" : "hayır")}");
     }
 
     public Process StartGame()
@@ -113,7 +127,8 @@ internal sealed class LauncherEngine
         Log("Guardians.exe başlatılıyor.");
 
         return Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Guardians.exe başlatılamadı.");
+            ?? throw new InvalidOperationException(
+                "Guardians.exe başlatılamadı.");
     }
 
     public void Cleanup()
@@ -166,7 +181,9 @@ internal sealed class LauncherEngine
         SetHiddenSystem(_backgroundPath);
     }
 
-    private void ImportAsset(IEnumerable<string> sourceNames, string destinationPath)
+    private void ImportAsset(
+        IEnumerable<string> sourceNames,
+        string destinationPath)
     {
         foreach (string sourceName in sourceNames)
         {
@@ -185,32 +202,6 @@ internal sealed class LauncherEngine
             SetHiddenSystem(destinationPath);
             return;
         }
-    }
-
-    private void ImportPatchZip()
-    {
-        string visibleZipPath = Path.Combine(_gameRoot, PatchZipName);
-
-        if (File.Exists(visibleZipPath))
-        {
-            RemoveRestrictiveAttributes(visibleZipPath);
-            RemoveRestrictiveAttributes(_hiddenZipPath);
-
-            File.Copy(visibleZipPath, _hiddenZipPath, overwrite: true);
-            File.Delete(visibleZipPath);
-
-            SetHiddenSystem(_hiddenZipPath);
-            Log("Yeni yama paketi gizli .ucrew klasörüne taşındı.");
-        }
-
-        if (!File.Exists(_hiddenZipPath))
-        {
-            throw new FileNotFoundException(
-                $"{PatchZipName} bulunamadı. İlk çalıştırmada EXE ile aynı klasöre koy.",
-                PatchZipName);
-        }
-
-        SetHiddenSystem(_hiddenZipPath);
     }
 
     private void MoveLegacyFilesOutOfSight()
@@ -241,7 +232,6 @@ internal sealed class LauncherEngine
         {
             foreach (string fileName in new[]
                      {
-                         "version.dll",
                          "ucrew_loader.dll",
                          "ucrew_loader.ini",
                          "winmm.dll"
@@ -252,7 +242,9 @@ internal sealed class LauncherEngine
         }
     }
 
-    private void MoveIntoLegacy(string fileName, string legacyRoot)
+    private void MoveIntoLegacy(
+        string fileName,
+        string legacyRoot)
     {
         string sourcePath = Path.Combine(_gameRoot, fileName);
         if (!File.Exists(sourcePath))
@@ -270,13 +262,14 @@ internal sealed class LauncherEngine
     }
 
     private void ExtractPatchIntoArchives(
+        string zipPath,
         IProgress<LauncherProgress> progress,
         CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(_backupRoot);
         SetHiddenSystem(_backupRoot);
 
-        using ZipArchive archive = ZipFile.OpenRead(_hiddenZipPath);
+        using ZipArchive archive = ZipFile.OpenRead(zipPath);
 
         List<ZipArchiveEntry> entries = archive.Entries
             .Where(entry =>
@@ -291,7 +284,8 @@ internal sealed class LauncherEngine
         }
 
         var extractedNames = new List<string>();
-        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seenNames = new HashSet<string>(
+            StringComparer.OrdinalIgnoreCase);
 
         for (int index = 0; index < entries.Count; index++)
         {
@@ -309,7 +303,8 @@ internal sealed class LauncherEngine
             if (!seenNames.Add(fileName))
             {
                 throw new InvalidDataException(
-                    $"Yama paketinde aynı ada sahip birden fazla dosya var: {fileName}");
+                    "Yama paketinde aynı ada sahip birden fazla dosya var: " +
+                    fileName);
             }
 
             string targetPath = Path.Combine(_archivesRoot, fileName);
@@ -330,25 +325,36 @@ internal sealed class LauncherEngine
             entry.ExtractToFile(targetPath, overwrite: true);
             SetHiddenSystem(targetPath);
 
-            int percent = 20 + (int)Math.Round(
-                ((index + 1d) / entries.Count) * 68d);
+            int percent = 73 + (int)Math.Round(
+                ((index + 1d) / entries.Count) * 18d);
 
             progress.Report(new LauncherProgress(
-                Math.Clamp(percent, 20, 88),
+                Math.Clamp(percent, 73, 91),
                 "Türkçe yama kuruluyor…",
                 $"{index + 1} / {entries.Count} dosya hazırlandı"));
 
             Log($"ARCHIVES İÇİNE AÇILDI: {fileName}");
         }
 
-        Log($"Toplam {extractedNames.Count} dosya archives içine hazırlandı.");
+        if (extractedNames.Count == 0)
+        {
+            throw new InvalidDataException(
+                "Yama paketinden hiçbir desteklenen dosya çıkarılamadı.");
+        }
+
+        Log(
+            $"Toplam {extractedNames.Count} dosya archives içine hazırlandı.");
     }
 
     private void CleanupStaleSession()
     {
         if (File.Exists(_manifestPath))
         {
-            foreach (string rawName in File.ReadAllLines(_manifestPath, Encoding.UTF8))
+            RemoveRestrictiveAttributes(_manifestPath);
+
+            foreach (string rawName in File.ReadAllLines(
+                         _manifestPath,
+                         Encoding.UTF8))
             {
                 string fileName = Path.GetFileName(rawName.Trim());
                 if (string.IsNullOrWhiteSpace(fileName))
@@ -356,7 +362,10 @@ internal sealed class LauncherEngine
                     continue;
                 }
 
-                string targetPath = Path.Combine(_archivesRoot, fileName);
+                string targetPath = Path.Combine(
+                    _archivesRoot,
+                    fileName);
+
                 if (File.Exists(targetPath))
                 {
                     RemoveRestrictiveAttributes(targetPath);
@@ -367,10 +376,13 @@ internal sealed class LauncherEngine
 
         if (Directory.Exists(_backupRoot))
         {
-            foreach (string backupPath in Directory.EnumerateFiles(_backupRoot))
+            foreach (string backupPath in Directory.EnumerateFiles(
+                         _backupRoot))
             {
                 string fileName = Path.GetFileName(backupPath);
-                string targetPath = Path.Combine(_archivesRoot, fileName);
+                string targetPath = Path.Combine(
+                    _archivesRoot,
+                    fileName);
 
                 RemoveRestrictiveAttributes(backupPath);
                 RemoveRestrictiveAttributes(targetPath);
@@ -438,7 +450,9 @@ internal sealed class LauncherEngine
             RemoveRestrictiveAttributes(_logPath);
 
             string line =
-                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}";
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] " +
+                message +
+                Environment.NewLine;
 
             File.AppendAllText(
                 _logPath,
