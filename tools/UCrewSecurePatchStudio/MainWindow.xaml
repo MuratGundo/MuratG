@@ -162,7 +162,7 @@
                                         <TextBox x:Name="ProfileSlugBox"/>
                                         <TextBlock Text="Oyun Adı" Margin="0,14,0,5"/>
                                         <TextBox x:Name="ProfileNameBox"/>
-                                        <TextBlock Text="Oyun EXE" Margin="0,14,0,5"/>
+                                        <TextBlock Text="Steam / Game Pass EXE yolları (; ile ayırın)" Margin="0,14,0,5"/>
                                         <TextBox x:Name="ProfileExeBox"/>
                                         <TextBlock Text="Hedef Klasör" Margin="0,14,0,5"/>
                                         <TextBox x:Name="ProfileTargetBox"/>
