@@ -1,0 +1,96 @@
+name: Build Guardians Game EXE Bootstrap
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-guardians-game-exe-bootstrap.yml"
+      - "tools/GuardiansGameExeBootstrap/**"
+      - "tools/GuardiansSilentLauncher/**"
+  pull_request:
+    paths:
+      - ".github/workflows/build-guardians-game-exe-bootstrap.yml"
+      - "tools/GuardiansGameExeBootstrap/**"
+      - "tools/GuardiansSilentLauncher/**"
+
+jobs:
+  build-win-x64:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish branded helper
+        shell: pwsh
+        run: |
+          dotnet publish `
+            tools/GuardiansSilentLauncher/GuardiansSilentLauncher.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:PublishTrimmed=false `
+            -p:DebugType=None `
+            -p:DebugSymbols=false `
+            -o publish/GuardiansHelper
+
+      - name: Configure Version proxy x64
+        shell: pwsh
+        run: |
+          cmake `
+            -S tools/GuardiansGameExeBootstrap `
+            -B build/GuardiansGameExeBootstrap `
+            -A x64
+
+      - name: Build Version proxy
+        shell: pwsh
+        run: |
+          cmake --build `
+            build/GuardiansGameExeBootstrap `
+            --config Release `
+            --verbose
+
+      - name: Prepare test package
+        shell: pwsh
+        run: |
+          $package = "package/UCREW_Guardians_Game_EXE"
+          New-Item -ItemType Directory -Force -Path $package | Out-Null
+
+          Copy-Item `
+            "build/GuardiansGameExeBootstrap/Release/version.dll" `
+            "$package/version.dll"
+
+          Copy-Item `
+            "publish/GuardiansHelper/UCREW_Guardians_TR.exe" `
+            "$package/UCREW_Guardians_TR.exe"
+
+          @"
+          U-CREW GUARDIANS — OYUN EXE BAŞLATMA TESTİ
+
+          1. Eski UCREW_Guardians_TR.exe dosyasını yenisiyle değiştir.
+          2. version.dll dosyasını Guardians.exe yanına koy.
+          3. Oyunu doğrudan Guardians.exe ile çalıştır.
+
+          Guardians.exe açıldığında:
+          - version.dll kendisini Gizli + Sistem yapar.
+          - UCREW_Guardians_TR.exe Gizli + Sistem yapılır.
+          - Görsel U-CREW yama ekranı açılır.
+          - Yama hazır olunca Guardians.exe devam eder.
+          - Oyun kapanınca geçici yama dosyaları temizlenir.
+
+          SmartScreen için ayrı U-CREW EXE dosyasına çift tıklanmaz.
+          Windows güvenliği genel olarak kapatılmaz.
+          "@ | Set-Content "$package/KURULUM.txt" -Encoding UTF8
+
+      - name: Upload game EXE bootstrap package
+        uses: actions/upload-artifact@v4
+        with:
+          name: UCREW-Guardians-Game-EXE-win-x64
+          path: package/UCREW_Guardians_Game_EXE
+          if-no-files-found: error
