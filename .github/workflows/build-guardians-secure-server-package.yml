@@ -19,12 +19,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate PHP syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l server/GuardiansSecurePatch/secure_patch_request.php
+          php -l server/GuardiansSecurePatch/secure_patch_download.php
+
       - name: Prepare server package
         shell: bash
         run: |
           set -euo pipefail
           package="package/UCREW_Guardians_Secure_Server"
-          mkdir -p "$package/api" "$package/tools"
+          mkdir -p "$package/api" "$package/tools" "$package/database"
 
           cp server/GuardiansSecurePatch/secure_patch_request.php \
              "$package/api/secure_patch_request.php"
@@ -34,41 +41,60 @@ jobs:
              "$package/tools/GUARDIANS_SECURE_PACK.ps1"
           cp server/GuardiansSecurePatch/GUARDIANS_SECURE_PACK.bat \
              "$package/tools/GUARDIANS_SECURE_PACK.bat"
+          cp server/GuardiansSecurePatch/INSTALL_SCHEMA.sql \
+             "$package/database/INSTALL_SCHEMA.sql"
+          cp server/GuardiansSecurePatch/INSTALL_VPS.sh \
+             "$package/INSTALL_VPS.sh"
           cp server/GuardiansSecurePatch/ucrew_guardians_server.json \
              "$package/ucrew_guardians_server.json"
+
+          chmod +x "$package/INSTALL_VPS.sh"
 
           cat > "$package/KURULUM.txt" <<'EOF'
           U-CREW GUARDIANS GÜVENLİ SUNUCU PAKETİ
 
-          1) api klasöründeki PHP dosyalarını API sunucusundaki /api klasörüne yükle:
-             - secure_patch_request.php
-             - secure_patch_download.php
+          HEDEF SUNUCU:
+          /var/www/api.u-crew.net
 
-          2) Panelde Guardians oyununun slug değerini "guardians" yap.
+          1) Paketi VPS'e yükle ve çıkar.
 
-          3) tools/GUARDIANS_SECURE_PACK.bat dosyasını çalıştır.
+          2) API dosyalarını otomatik kur:
+             sudo bash INSTALL_VPS.sh
+
+             Kurulum şunları yapar:
+             - PHP dosyalarını /var/www/api.u-crew.net/api içine koyar
+             - /var/www/api.u-crew.net/secure_patches/guardians klasörünü oluşturur
+             - www-data izinlerini ayarlar
+             - PHP sözdizimini ve nginx yapılandırmasını kontrol eder
+
+          3) database/INSTALL_SCHEMA.sql dosyasını yeni MySQL veritabanında çalıştır.
+             Eski UUM/SQLite veritabanını kullanma.
+
+          4) Panelde Guardians oyununun slug değerini "guardians" yap.
+
+          5) Windows'ta tools/GUARDIANS_SECURE_PACK.bat dosyasını çalıştır.
              UCREW_Guardians_TR.zip dosyasını seç.
              Araç şunları oluşturur:
              - şifreli .ucrew paketi
              - guardians_secure_metadata.json
              - REGISTER_IN_DATABASE.sql
 
-          4) .ucrew dosyasını web uygulaması kökünde şu dizine yükle:
-             secure_patches/guardians/
+          6) .ucrew dosyasını VPS'te şuraya yükle:
+             /var/www/api.u-crew.net/secure_patches/guardians/
 
-          5) REGISTER_IN_DATABASE.sql dosyasını yeni MySQL veritabanında çalıştır.
+          7) Oluşan REGISTER_IN_DATABASE.sql dosyasını yeni MySQL veritabanında çalıştır.
 
-          6) İstemci paketindeki UCREW_Guardians_TR.exe ve version.dll dosyalarını
+          8) İstemci paketindeki UCREW_Guardians_TR.exe ve version.dll dosyalarını
              oyun klasörüne koy. Kullanıcı U-CREW Launcher'a bir kez giriş yapıp
              "Beni Hatırla" seçeneğini etkinleştirmelidir.
 
-          7) Oyunu doğrudan Guardians.exe ile başlat.
+          9) Oyunu doğrudan Guardians.exe ile başlat.
 
           NOT:
-          - Eski UUM/SQLite sistemi kullanılmaz.
           - Anahtar ve IV yalnızca secure_patch_files tablosunda tutulur.
           - İndirilen paket şifreli ve Gizli + Sistem önbellekte saklanır.
           - Açık LANDb/font dosyaları yalnızca oyun çalışırken archives içine konur.
+          - Mevcut çalışan istemciyi sunucu kurulmadan değiştirme.
           EOF
 
       - name: Upload server package
