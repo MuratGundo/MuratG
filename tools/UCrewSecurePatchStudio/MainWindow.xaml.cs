@@ -35,6 +35,7 @@ public partial class MainWindow : Window
         _logger.MessageWritten += Logger_MessageWritten;
 
         LoadSettingsToUi();
+        LoadBundledClient();
         LoadDefaultProfile();
         RefreshLogs();
         UpdatePublishSummary();
@@ -348,13 +349,15 @@ public partial class MainWindow : Window
             async (progress, token) =>
             {
                 string profilePath = Path.GetFullPath(BuildProfilePathBox.Text.Trim());
-                string clientExePath = Path.GetFullPath(ClientExePathBox.Text.Trim());
+                string clientExePath = ResolveClientExePath();
                 string outputRoot = Path.GetFullPath(BuildOutputPathBox.Text.Trim());
 
                 if (!File.Exists(profilePath))
                     throw new FileNotFoundException("Önce kaydedilmiş oyun profilini seçin.", profilePath);
                 if (!File.Exists(clientExePath))
-                    throw new FileNotFoundException("UCREW_SecurePatch.exe dosyasını seçin.", clientExePath);
+                    throw new FileNotFoundException(
+                        "Studio paketindeki güncel UCREW_SecurePatch.exe bulunamadı. Gerekirse dosyayı elle seçin.",
+                        clientExePath);
 
                 GameProfile profile = _profileService.Load(profilePath);
                 string logoPath = profile.Theme?.Logo ?? string.Empty;
@@ -378,6 +381,7 @@ public partial class MainWindow : Window
                     string backgroundName = "game-background" + Path.GetExtension(backgroundPath).ToLowerInvariant();
 
                     File.Copy(clientExePath, Path.Combine(staging, "UCREW_SecurePatch.exe"), true);
+                    File.Copy(profilePath, Path.Combine(staging, profile.GameSlug + "_server_profile.json"), true);
                     File.Copy(logoPath, Path.Combine(staging, logoName), true);
                     File.Copy(backgroundPath, Path.Combine(staging, backgroundName), true);
 
@@ -551,6 +555,27 @@ public partial class MainWindow : Window
             _operationCancellation = null;
             RefreshLogs();
         }
+    }
+
+    private void LoadBundledClient()
+    {
+        string bundledClient = Path.Combine(AppContext.BaseDirectory, "UCREW_SecurePatch.exe");
+        if (File.Exists(bundledClient))
+        {
+            ClientExePathBox.Text = bundledClient;
+            _logger.Write("Güncel güvenli yama istemcisi Studio paketinden otomatik seçildi.");
+        }
+    }
+
+    private string ResolveClientExePath()
+    {
+        string selected = ClientExePathBox.Text.Trim();
+        if (!string.IsNullOrWhiteSpace(selected))
+        {
+            return Path.GetFullPath(selected);
+        }
+
+        return Path.Combine(AppContext.BaseDirectory, "UCREW_SecurePatch.exe");
     }
 
     private void LoadSettingsToUi()
