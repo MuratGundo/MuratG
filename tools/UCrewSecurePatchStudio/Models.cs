@@ -40,6 +40,9 @@ internal sealed class GameProfile
     [JsonPropertyName("target_path")]
     public string TargetPath { get; set; } = string.Empty;
 
+    [JsonPropertyName("target_paths")]
+    public string[] TargetPaths { get; set; } = Array.Empty<string>();
+
     [JsonPropertyName("allowed_extensions")]
     public string[] AllowedExtensions { get; set; } = Array.Empty<string>();
 
