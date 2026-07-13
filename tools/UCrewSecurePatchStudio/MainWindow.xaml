@@ -164,7 +164,7 @@
                                         <TextBox x:Name="ProfileNameBox"/>
                                         <TextBlock Text="Steam / Game Pass EXE yolları (; ile ayırın)" Margin="0,14,0,5"/>
                                         <TextBox x:Name="ProfileExeBox"/>
-                                        <TextBlock Text="Hedef Klasör" Margin="0,14,0,5"/>
+                                        <TextBlock Text="Steam / Game Pass hedef klasörleri (; ile ayırın)" Margin="0,14,0,5"/>
                                         <TextBox x:Name="ProfileTargetBox"/>
                                         <TextBlock Text="Kurulum Modu" Margin="0,14,0,5"/>
                                         <ComboBox x:Name="ProfileInstallModeBox">
