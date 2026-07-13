@@ -97,6 +97,9 @@ internal sealed class RuntimeProfile
     [JsonPropertyName("target_path")]
     public string TargetPath { get; set; } = "";
 
+    [JsonPropertyName("target_paths")]
+    public string[] TargetPaths { get; set; } = Array.Empty<string>();
+
     [JsonPropertyName("allowed_extensions")]
     public string[] AllowedExtensions { get; set; } = Array.Empty<string>();
 
