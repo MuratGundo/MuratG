@@ -9,6 +9,8 @@ internal sealed class StudioSettings
     public string SshUser { get; set; } = "root";
     public string DatabaseName { get; set; } = "ucrewnet_ucrew_patch_v3";
     public string DatabaseUser { get; set; } = "root";
+    public string EncryptedSshPassword { get; set; } = string.Empty;
+    public string EncryptedDatabasePassword { get; set; } = string.Empty;
     public string LastProfilePath { get; set; } = string.Empty;
     public string LastSourcePath { get; set; } = string.Empty;
     public string LastOutputPath { get; set; } = string.Empty;
