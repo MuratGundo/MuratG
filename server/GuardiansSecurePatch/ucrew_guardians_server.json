@@ -1,0 +1,6 @@
+{
+  "Enabled": true,
+  "ApiBase": "https://api.u-crew.net/api/",
+  "FallbackApiBase": "https://www.u-crew.net/ucrew_patch_v3/api/",
+  "Slug": "guardians"
+}
