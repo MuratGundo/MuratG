@@ -402,9 +402,12 @@ internal sealed class SecurePatchApiClient
         }
 
         if (ticket.RuntimeProfile is null ||
-            string.IsNullOrWhiteSpace(ticket.RuntimeProfile.GameExe))
+            (string.IsNullOrWhiteSpace(ticket.RuntimeProfile.GameExe) &&
+             (ticket.RuntimeProfile.GameExecutables is null ||
+              ticket.RuntimeProfile.GameExecutables.Length == 0)))
         {
-            throw new InvalidDataException("Sunucu geçerli oyun çalışma profili göndermedi.");
+            throw new InvalidDataException(
+                "Sunucu geçerli oyun çalışma profili göndermedi. game_exe veya game_exes boş.");
         }
     }
 
