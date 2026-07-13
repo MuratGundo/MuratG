@@ -5,6 +5,8 @@ namespace UCREW.SecurePatch;
 
 internal static class TokenProvider
 {
+    private static string _runtimeToken = string.Empty;
+
     private static readonly string[] TokenPropertyNames =
     {
         "token",
@@ -16,8 +18,33 @@ internal static class TokenProvider
         "AccessToken"
     };
 
+    public static void SetRuntimeToken(string token, bool remember)
+    {
+        _runtimeToken = token?.Trim() ?? string.Empty;
+        string sessionPath = GetSessionPath();
+
+        if (remember && !string.IsNullOrWhiteSpace(_runtimeToken))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(sessionPath)!);
+            File.WriteAllText(
+                sessionPath,
+                JsonSerializer.Serialize(new { Token = _runtimeToken }),
+                new UTF8Encoding(false));
+        }
+        else if (File.Exists(sessionPath))
+        {
+            File.Delete(sessionPath);
+        }
+    }
+
     public static string ReadRememberedToken(Action<string> log)
     {
+        if (!string.IsNullOrWhiteSpace(_runtimeToken))
+        {
+            log("U-CREW oturumu giriş ekranından alındı.");
+            return _runtimeToken;
+        }
+
         string environmentToken = Environment.GetEnvironmentVariable("UCREW_TOKEN") ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(environmentToken))
         {
@@ -30,6 +57,7 @@ internal static class TokenProvider
 
         string[] candidates =
         {
+            GetSessionPath(),
             Path.Combine(roaming, "U-CREW", "Launcher", "settings.json"),
             Path.Combine(local, "U-CREW", "Launcher", "settings.json"),
             Path.Combine(roaming, "UCREWLauncher", "settings.json"),
@@ -65,6 +93,15 @@ internal static class TokenProvider
 
         throw new InvalidOperationException(
             "U-CREW oturumu bulunamadı. U-CREW Launcher'a giriş yapıp 'Beni Hatırla' seçeneğini etkinleştirin.");
+    }
+
+    private static string GetSessionPath()
+    {
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "U-CREW",
+            "SecurePatch",
+            "session.json");
     }
 
     private static string FindToken(JsonElement element)
