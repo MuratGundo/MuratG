@@ -2,7 +2,7 @@
 // U-CREW genel şifreli yama indirme uç noktası.
 // Tek kullanımlık bilet ve HWID doğrulaması yapar.
 
-require_once __DIR__ . '/../../includes/bootstrap.php';
+require_once __DIR__ . '/../includes/bootstrap.php';
 
 function ucrew_download_fail($message, $code) {
     while (ob_get_level() > 0) { @ob_end_clean(); }
@@ -31,14 +31,14 @@ function ucrew_resolve_patch_path($storedPath) {
     if ($isWindowsAbsolute || $isUnixAbsolute) {
         $candidate = $storedPath;
     } else {
-        $candidate = dirname(__DIR__, 2) . '/' . ltrim($storedPath, '/\\');
+        $candidate = dirname(__DIR__) . '/' . ltrim($storedPath, '/\\');
     }
 
     $real = realpath($candidate);
     if ($real === false || !is_file($real)) return false;
 
     if (!$isWindowsAbsolute && !$isUnixAbsolute) {
-        $root = realpath(dirname(__DIR__, 2));
+        $root = realpath(dirname(__DIR__));
         if ($root === false) return false;
 
         $rootNormalized = rtrim(str_replace('\\', '/', $root), '/') . '/';
