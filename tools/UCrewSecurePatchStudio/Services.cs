@@ -104,6 +104,43 @@ internal sealed class SettingsService
         }
     }
 
+    public string ProtectSecret(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        byte[] plain = Encoding.UTF8.GetBytes(value);
+        byte[] encrypted = ProtectedData.Protect(
+            plain,
+            optionalEntropy: null,
+            DataProtectionScope.CurrentUser);
+        return Convert.ToBase64String(encrypted);
+    }
+
+    public string UnprotectSecret(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            byte[] encrypted = Convert.FromBase64String(value);
+            byte[] plain = ProtectedData.Unprotect(
+                encrypted,
+                optionalEntropy: null,
+                DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(plain);
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
     public void Save(StudioSettings settings)
     {
         File.WriteAllText(
