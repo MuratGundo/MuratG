@@ -31,6 +31,9 @@ internal sealed class GameProfile
     [JsonPropertyName("game_exe")]
     public string GameExe { get; set; } = string.Empty;
 
+    [JsonPropertyName("game_exes")]
+    public string[] GameExecutables { get; set; } = Array.Empty<string>();
+
     [JsonPropertyName("install_mode")]
     public string InstallMode { get; set; } = "overlay_tree";
 
