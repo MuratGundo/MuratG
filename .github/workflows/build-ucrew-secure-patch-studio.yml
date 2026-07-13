@@ -35,7 +35,9 @@ jobs:
         run: dotnet restore tools/UCrewSecurePatchStudio/UCrewSecurePatchStudio.csproj
 
       - name: Publish single EXE
+        id: publish
         shell: pwsh
+        continue-on-error: true
         run: |
           dotnet publish tools/UCrewSecurePatchStudio/UCrewSecurePatchStudio.csproj `
             -c Release `
@@ -44,7 +46,24 @@ jobs:
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:EnableCompressionInSingleFile=true `
-            -o publish
+            -o publish 2>&1 | Tee-Object -FilePath build.log
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: UCREW-Secure-Patch-Studio-build-log
+          path: build.log
+          if-no-files-found: warn
+
+      - name: Stop on publish failure
+        if: steps.publish.outcome == 'failure'
+        shell: pwsh
+        run: exit 1
 
       - name: Prepare package
         shell: pwsh
