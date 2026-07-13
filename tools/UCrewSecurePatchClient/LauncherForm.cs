@@ -236,7 +236,10 @@ internal sealed class LauncherForm : Form
 
             if (profile.WaitForGameExit)
             {
-                await process.WaitForExitAsync(_cancellation.Token);
+                await _runtime.WaitForGameExitAsync(
+                    process,
+                    profile,
+                    _cancellation.Token);
             }
 
             if (session.CleanupOnExit)
