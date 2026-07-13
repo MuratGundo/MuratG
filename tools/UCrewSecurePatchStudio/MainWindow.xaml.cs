@@ -373,6 +373,7 @@ public partial class MainWindow : Window
                     Path.GetTempPath(),
                     "UCREW_CLIENT_" + Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(staging);
+                string payloadPath = staging + ".zip";
 
                 try
                 {
@@ -380,8 +381,6 @@ public partial class MainWindow : Window
                     string logoName = "ucrew-logo" + Path.GetExtension(logoPath).ToLowerInvariant();
                     string backgroundName = "game-background" + Path.GetExtension(backgroundPath).ToLowerInvariant();
 
-                    File.Copy(clientExePath, Path.Combine(staging, "UCREW_SecurePatch.exe"), true);
-                    File.Copy(profilePath, Path.Combine(staging, profile.GameSlug + "_server_profile.json"), true);
                     File.Copy(logoPath, Path.Combine(staging, logoName), true);
                     File.Copy(backgroundPath, Path.Combine(staging, backgroundName), true);
 
@@ -408,32 +407,39 @@ public partial class MainWindow : Window
                         Path.Combine(staging, "ucrew_game.json"),
                         JsonSerializer.Serialize(gameConfig, new JsonSerializerOptions { WriteIndented = true }),
                         new UTF8Encoding(false));
-                    File.WriteAllText(
-                        Path.Combine(staging, "KURULUM.txt"),
-                        "UCREW_SecurePatch.exe, ucrew_game.json, logo ve arka plan dosyalarını " +
-                        profile.GameExe + " dosyasının bulunduğu oyun klasörüne kopyalayın." +
-                        Environment.NewLine + "Ardından UCREW_SecurePatch.exe dosyasını çalıştırın.",
-                        new UTF8Encoding(false));
-
-                    progress.Report(65);
-                    string zipPath = Path.Combine(
+                    progress.Report(55);
+                    string exePath = Path.Combine(
                         outputRoot,
-                        "UCREW_" + profile.GameSlug + "_Guvenli_Yama_Uygulamasi.zip");
-                    if (File.Exists(zipPath))
-                        File.Delete(zipPath);
+                        "UCREW_" + profile.GameSlug + "_Turkce_Yama.exe");
+                    if (File.Exists(exePath))
+                        File.Delete(exePath);
+                    if (File.Exists(payloadPath))
+                        File.Delete(payloadPath);
 
-                    await Task.Run(
-                        () => ZipFile.CreateFromDirectory(
+                    await Task.Run(() =>
+                    {
+                        ZipFile.CreateFromDirectory(
                             staging,
-                            zipPath,
+                            payloadPath,
                             CompressionLevel.Optimal,
-                            includeBaseDirectory: false),
-                        token);
+                            includeBaseDirectory: false);
+
+                        using var output = new FileStream(exePath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                        using (FileStream client = File.OpenRead(clientExePath))
+                            client.CopyTo(output);
+                        using (FileStream payload = File.OpenRead(payloadPath))
+                            payload.CopyTo(output);
+
+                        using var writer = new BinaryWriter(output, Encoding.UTF8, leaveOpen: true);
+                        writer.Write(new FileInfo(payloadPath).Length);
+                        writer.Write(Encoding.ASCII.GetBytes("UCREW_PAYLOAD_V1"));
+                        output.Flush(flushToDisk: true);
+                    }, token);
 
                     progress.Report(100);
-                    ClientPackageResultText.Text = "Hazır: " + zipPath;
+                    ClientPackageResultText.Text = "Tek EXE hazır: " + exePath;
                     MessageBox.Show(
-                        "Oyuna özel U-CREW yama uygulaması başarıyla oluşturuldu.",
+                        "Logo, arka plan ve oyun ayarları içine gömülmüş tek EXE başarıyla oluşturuldu.",
                         "U-CREW Studio",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
@@ -442,6 +448,8 @@ public partial class MainWindow : Window
                 {
                     if (Directory.Exists(staging))
                         Directory.Delete(staging, true);
+                    if (File.Exists(payloadPath))
+                        File.Delete(payloadPath);
                 }
             });
     }
