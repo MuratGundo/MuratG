@@ -1,0 +1,13 @@
+LIBRARY "version"
+
+EXPORTS
+    GetFileVersionInfoSizeA=UCrew_GetFileVersionInfoSizeA
+    GetFileVersionInfoSizeW=UCrew_GetFileVersionInfoSizeW
+    GetFileVersionInfoSizeExA=UCrew_GetFileVersionInfoSizeExA
+    GetFileVersionInfoSizeExW=UCrew_GetFileVersionInfoSizeExW
+    GetFileVersionInfoA=UCrew_GetFileVersionInfoA
+    GetFileVersionInfoW=UCrew_GetFileVersionInfoW
+    GetFileVersionInfoExA=UCrew_GetFileVersionInfoExA
+    GetFileVersionInfoExW=UCrew_GetFileVersionInfoExW
+    VerQueryValueA=UCrew_VerQueryValueA
+    VerQueryValueW=UCrew_VerQueryValueW
