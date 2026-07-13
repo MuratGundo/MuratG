@@ -636,12 +636,30 @@ internal sealed class PackageBuilderService
             new JsonSerializerOptions { PropertyNamingPolicy = null });
         string slug = StudioValidation.SqlEscape(metadata.GameSlug);
         string channel = StudioValidation.SqlEscape(metadata.Channel);
+        string title = StudioValidation.SqlEscape(metadata.GameName);
+        string shortName = StudioValidation.SqlEscape(
+            metadata.GameName.Length > 80 ? metadata.GameName[..80] : metadata.GameName);
+        string gameVersion = StudioValidation.SqlEscape(metadata.Version);
 
         return $"""
 -- U-CREW genel güvenli yama kaydı
 -- Oyun: {metadata.GameName}
 -- Sürüm: {metadata.Version}
 -- Paket: {metadata.ServerRelativePath}
+
+-- Oyun panelde yoksa otomatik oluştur.
+INSERT IGNORE INTO games
+(id, slug, title, short_name, current_version, status, created_at, updated_at)
+SELECT
+    ids.next_id,
+    '{slug}',
+    '{title}',
+    '{shortName}',
+    '{gameVersion}',
+    'active',
+    NOW(),
+    NOW()
+FROM (SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM games) AS ids;
 
 SET @ucrew_game_id := (
     SELECT id FROM games WHERE LOWER(slug)=LOWER('{slug}') LIMIT 1
