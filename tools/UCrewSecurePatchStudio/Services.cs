@@ -209,10 +209,16 @@ internal static class StudioValidation
         profile.GameExe = executableCandidates[0];
         profile.GameExecutables = executableCandidates;
 
-        profile.TargetPath = NormalizeRelativePath(
-            profile.TargetPath,
-            "Hedef klasör",
-            allowEmpty: true);
+        string[] targetCandidates = (profile.TargetPaths ?? Array.Empty<string>())
+            .Concat(string.IsNullOrWhiteSpace(profile.TargetPath)
+                ? Array.Empty<string>()
+                : new[] { profile.TargetPath })
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => NormalizeRelativePath(value, "Hedef klasör"))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        profile.TargetPath = targetCandidates.FirstOrDefault() ?? string.Empty;
+        profile.TargetPaths = targetCandidates;
         profile.InstallMode = (profile.InstallMode ?? string.Empty).Trim().ToLowerInvariant();
         profile.BootstrapType = string.IsNullOrWhiteSpace(profile.BootstrapType)
             ? "launcher"
