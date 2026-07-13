@@ -1,0 +1,25 @@
+{
+  "game_slug": "guardians",
+  "game_name": "Marvel's Guardians of the Galaxy: The Telltale Series",
+  "game_exe": "Guardians.exe",
+  "install_mode": "overlay_flat",
+  "target_path": "archives",
+  "allowed_extensions": [
+    ".landb",
+    ".font",
+    ".fnt",
+    ".dds",
+    ".d3dtx"
+  ],
+  "cleanup_on_exit": true,
+  "preserve_directory_tree": false,
+  "requires_bootstrap": true,
+  "bootstrap_type": "version_proxy",
+  "wait_for_game_exit": true,
+  "backup_existing_files": true,
+  "theme": {
+    "logo": "ucrew-logo.png",
+    "background": "guardians-background.jpg",
+    "accent": "#55ff00"
+  }
+}
