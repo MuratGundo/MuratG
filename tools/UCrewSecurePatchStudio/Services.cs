@@ -742,10 +742,16 @@ internal sealed class ServerDeploymentService
                         "API testi JSON yanıtı vermedi: " + apiOutput);
                 }
 
+                string testDetails = apiOutput.Contains(
+                    "Oturum geçersiz",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "API bağlantısı ve kimlik doğrulama koruması başarıyla test edildi."
+                    : "API testi başarılı: " + apiOutput.Trim();
+
                 return new OperationResult(
                     true,
                     "Genel güvenli yama sunucusu başarıyla kuruldu.",
-                    apiOutput.Trim());
+                    testDetails);
             }
             finally
             {
