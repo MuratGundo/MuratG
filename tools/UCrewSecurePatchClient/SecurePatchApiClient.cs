@@ -310,58 +310,61 @@ internal sealed class SecurePatchApiClient
             response.EnsureSuccessStatusCode();
 
             long? total = response.Content.Headers.ContentLength;
-            await using Stream source = await response.Content.ReadAsStreamAsync(cancellationToken)
-                .ConfigureAwait(false);
-            await using var destination = new FileStream(
-                temporaryPath,
-                FileMode.Create,
-                FileAccess.Write,
-                FileShare.None,
-                bufferSize: 1024 * 128,
-                useAsync: true);
-
-            byte[] buffer = new byte[1024 * 128];
             long received = 0;
-            int lastPercent = -1;
-
-            while (true)
+            await using (Stream source = await response.Content.ReadAsStreamAsync(cancellationToken)
+                             .ConfigureAwait(false))
             {
-                int read = await source.ReadAsync(
-                    buffer.AsMemory(0, buffer.Length),
-                    cancellationToken).ConfigureAwait(false);
-                if (read <= 0)
+                await using (var destination = new FileStream(
+                                 temporaryPath,
+                                 FileMode.Create,
+                                 FileAccess.Write,
+                                 FileShare.None,
+                                 bufferSize: 1024 * 128,
+                                 useAsync: true))
                 {
-                    break;
-                }
+                    byte[] buffer = new byte[1024 * 128];
+                    int lastPercent = -1;
 
-                await destination.WriteAsync(
-                    buffer.AsMemory(0, read),
-                    cancellationToken).ConfigureAwait(false);
-                received += read;
+                    while (true)
+                    {
+                        int read = await source.ReadAsync(
+                            buffer.AsMemory(0, buffer.Length),
+                            cancellationToken).ConfigureAwait(false);
+                        if (read <= 0)
+                        {
+                            break;
+                        }
 
-                int percent = total is > 0
-                    ? (int)Math.Clamp(Math.Round(received * 100d / total.Value), 0, 100)
-                    : 0;
+                        await destination.WriteAsync(
+                            buffer.AsMemory(0, read),
+                            cancellationToken).ConfigureAwait(false);
+                        received += read;
 
-                if (percent != lastPercent)
-                {
-                    lastPercent = percent;
-                    int overall = total is > 0
-                        ? 12 + (int)Math.Round(percent * 0.40)
-                        : 28;
-                    string detail = total is > 0
-                        ? $"Şifreli paket indiriliyor: %{percent} " +
-                          $"({FileSystemUtil.FormatBytes(received)} / {FileSystemUtil.FormatBytes(total.Value)})"
-                        : $"Şifreli paket indiriliyor: {FileSystemUtil.FormatBytes(received)}";
+                        int percent = total is > 0
+                            ? (int)Math.Clamp(Math.Round(received * 100d / total.Value), 0, 100)
+                            : 0;
 
-                    progress.Report(new LauncherProgress(
-                        Math.Clamp(overall, 12, 52),
-                        "Türkçe yama indiriliyor…",
-                        detail));
+                        if (percent != lastPercent)
+                        {
+                            lastPercent = percent;
+                            int overall = total is > 0
+                                ? 12 + (int)Math.Round(percent * 0.40)
+                                : 28;
+                            string detail = total is > 0
+                                ? $"Şifreli paket indiriliyor: %{percent} " +
+                                  $"({FileSystemUtil.FormatBytes(received)} / {FileSystemUtil.FormatBytes(total.Value)})"
+                                : $"Şifreli paket indiriliyor: {FileSystemUtil.FormatBytes(received)}";
+
+                            progress.Report(new LauncherProgress(
+                                Math.Clamp(overall, 12, 52),
+                                "Türkçe yama indiriliyor…",
+                                detail));
+                        }
+                    }
+
+                    await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
                 }
             }
-
-            await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
 
             if (received <= 0)
             {
