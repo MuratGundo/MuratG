@@ -1,0 +1,73 @@
+name: Build U-CREW Secure Patch Manager
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-ucrew-secure-patch-manager.yml"
+      - "tools/UCrewSecurePatchManager/**"
+      - "server/UCrewSecurePatch/api/**"
+      - "server/UCrewSecurePatch/database/**"
+      - "server/UCrewSecurePatch/INSTALL_VPS.sh"
+  pull_request:
+    paths:
+      - ".github/workflows/build-ucrew-secure-patch-manager.yml"
+      - "tools/UCrewSecurePatchManager/**"
+      - "server/UCrewSecurePatch/api/**"
+      - "server/UCrewSecurePatch/database/**"
+      - "server/UCrewSecurePatch/INSTALL_VPS.sh"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore tools/UCrewSecurePatchManager/UCrewSecurePatchManager.csproj
+
+      - name: Publish win-x64 single EXE
+        shell: pwsh
+        run: |
+          dotnet publish tools/UCrewSecurePatchManager/UCrewSecurePatchManager.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -o publish
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package | Out-Null
+          Copy-Item publish/UCREW_SecurePatch_Manager.exe package/UCREW_SecurePatch_Manager.exe
+          @"
+          U-CREW GUVENLI YAMA YONETICISI
+
+          Tek arayuzden:
+          - VPS baglantisi ve genel sunucu kurulumu
+          - Oyun profili olusturma
+          - AES-256 sifreli .ucp paketi hazirlama
+          - SHA-256 dogrulama
+          - Paketi VPS'e yukleme
+          - MySQL kaydi olusturma
+
+          SSH sifresi uygulama icinde tutulmaz veya kaydedilmez.
+          "@ | Set-Content package/KURULUM.txt -Encoding UTF8
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UCREW-Guvenli-Yama-Yoneticisi-win-x64
+          path: package
+          if-no-files-found: error
