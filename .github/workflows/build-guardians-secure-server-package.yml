@@ -1,0 +1,79 @@
+name: Build Guardians Secure Server Package
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-guardians-secure-server-package.yml"
+      - "server/GuardiansSecurePatch/**"
+  pull_request:
+    paths:
+      - ".github/workflows/build-guardians-secure-server-package.yml"
+      - "server/GuardiansSecurePatch/**"
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare server package
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="package/UCREW_Guardians_Secure_Server"
+          mkdir -p "$package/api" "$package/tools"
+
+          cp server/GuardiansSecurePatch/secure_patch_request.php \
+             "$package/api/secure_patch_request.php"
+          cp server/GuardiansSecurePatch/secure_patch_download.php \
+             "$package/api/secure_patch_download.php"
+          cp server/GuardiansSecurePatch/GUARDIANS_SECURE_PACK.ps1 \
+             "$package/tools/GUARDIANS_SECURE_PACK.ps1"
+          cp server/GuardiansSecurePatch/GUARDIANS_SECURE_PACK.bat \
+             "$package/tools/GUARDIANS_SECURE_PACK.bat"
+          cp server/GuardiansSecurePatch/ucrew_guardians_server.json \
+             "$package/ucrew_guardians_server.json"
+
+          cat > "$package/KURULUM.txt" <<'EOF'
+          U-CREW GUARDIANS GÜVENLİ SUNUCU PAKETİ
+
+          1) api klasöründeki PHP dosyalarını API sunucusundaki /api klasörüne yükle:
+             - secure_patch_request.php
+             - secure_patch_download.php
+
+          2) Panelde Guardians oyununun slug değerini "guardians" yap.
+
+          3) tools/GUARDIANS_SECURE_PACK.bat dosyasını çalıştır.
+             UCREW_Guardians_TR.zip dosyasını seç.
+             Araç şunları oluşturur:
+             - şifreli .ucrew paketi
+             - guardians_secure_metadata.json
+             - REGISTER_IN_DATABASE.sql
+
+          4) .ucrew dosyasını web uygulaması kökünde şu dizine yükle:
+             secure_patches/guardians/
+
+          5) REGISTER_IN_DATABASE.sql dosyasını yeni MySQL veritabanında çalıştır.
+
+          6) İstemci paketindeki UCREW_Guardians_TR.exe ve version.dll dosyalarını
+             oyun klasörüne koy. Kullanıcı U-CREW Launcher'a bir kez giriş yapıp
+             "Beni Hatırla" seçeneğini etkinleştirmelidir.
+
+          7) Oyunu doğrudan Guardians.exe ile başlat.
+
+          NOT:
+          - Eski UUM/SQLite sistemi kullanılmaz.
+          - Anahtar ve IV yalnızca secure_patch_files tablosunda tutulur.
+          - İndirilen paket şifreli ve Gizli + Sistem önbellekte saklanır.
+          - Açık LANDb/font dosyaları yalnızca oyun çalışırken archives içine konur.
+          EOF
+
+      - name: Upload server package
+        uses: actions/upload-artifact@v4
+        with:
+          name: UCREW-Guardians-Secure-Server-Package
+          path: package/UCREW_Guardians_Secure_Server
+          if-no-files-found: error
