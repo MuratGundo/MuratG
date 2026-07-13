@@ -1092,6 +1092,32 @@ internal sealed class PatchPublisherService
         }, cancellationToken).ConfigureAwait(false);
     }
 
+    private static string BuildEnsureGameSql(PatchMetadata metadata)
+    {
+        string slug = StudioValidation.SqlEscape(metadata.GameSlug);
+        string title = StudioValidation.SqlEscape(metadata.GameName);
+        string shortName = StudioValidation.SqlEscape(
+            metadata.GameName.Length > 80 ? metadata.GameName[..80] : metadata.GameName);
+        string version = StudioValidation.SqlEscape(metadata.Version);
+
+        return $"""
+INSERT IGNORE INTO games
+(id, slug, title, short_name, current_version, status, created_at, updated_at)
+SELECT
+    ids.next_id,
+    '{slug}',
+    '{title}',
+    '{shortName}',
+    '{version}',
+    'active',
+    NOW(),
+    NOW()
+FROM (SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM games) AS ids;
+
+SELECT id FROM games WHERE LOWER(slug)=LOWER('{slug}') LIMIT 1;
+""";
+    }
+
     private static string BuildMySqlImportCommand(
         StudioSettings settings,
         string databasePassword,
