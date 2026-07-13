@@ -33,6 +33,7 @@ internal sealed class LauncherForm : Form
         ShowInTaskbar = true;
         DoubleBuffered = true;
         KeyPreview = true;
+        AutoScaleMode = AutoScaleMode.Dpi;
 
         BackgroundImage = LoadImageUnlocked(_engine.BackgroundPath);
         BackgroundImageLayout = ImageLayout.Stretch;
@@ -76,8 +77,8 @@ internal sealed class LauncherForm : Form
 
         var contentPanel = new Panel
         {
-            Location = new Point(34, 354),
-            Size = new Size(892, 150),
+            Location = new Point(34, 346),
+            Size = new Size(892, 164),
             BackColor = Color.FromArgb(205, 6, 9, 16)
         };
 
@@ -86,11 +87,12 @@ internal sealed class LauncherForm : Form
         var titleLabel = new Label
         {
             AutoSize = true,
-            Location = new Point(24, 18),
+            Location = new Point(24, 15),
             Text = "GALAKSİNİN KORUYUCULARI • TÜRKÇE YAMA",
             ForeColor = Color.FromArgb(169, 255, 45),
             BackColor = Color.Transparent,
-            Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold)
+            Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold),
+            UseCompatibleTextRendering = true
         };
 
         contentPanel.Controls.Add(titleLabel);
@@ -98,13 +100,15 @@ internal sealed class LauncherForm : Form
         _statusLabel = new Label
         {
             AutoSize = false,
-            Location = new Point(24, 43),
-            Size = new Size(844, 36),
+            Location = new Point(24, 36),
+            Size = new Size(844, 50),
             Text = "Başlatıcı hazırlanıyor…",
             ForeColor = Color.White,
             BackColor = Color.Transparent,
-            Font = new Font("Segoe UI Semibold", 21f, FontStyle.Bold),
-            TextAlign = ContentAlignment.MiddleLeft
+            Font = new Font("Segoe UI Semibold", 19.5f, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(0, 0, 0, 2),
+            UseCompatibleTextRendering = true
         };
 
         contentPanel.Controls.Add(_statusLabel);
@@ -112,20 +116,22 @@ internal sealed class LauncherForm : Form
         _detailLabel = new Label
         {
             AutoSize = false,
-            Location = new Point(25, 80),
-            Size = new Size(842, 24),
+            Location = new Point(25, 86),
+            Size = new Size(842, 27),
             Text = "U-CREW güvenli yama sistemi başlatılıyor.",
             ForeColor = Color.FromArgb(205, 211, 222),
             BackColor = Color.Transparent,
-            Font = new Font("Segoe UI", 10.5f, FontStyle.Regular),
-            TextAlign = ContentAlignment.MiddleLeft
+            Font = new Font("Segoe UI", 10f, FontStyle.Regular),
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(0, 0, 0, 1),
+            UseCompatibleTextRendering = true
         };
 
         contentPanel.Controls.Add(_detailLabel);
 
         _progressTrack = new Panel
         {
-            Location = new Point(25, 116),
+            Location = new Point(25, 126),
             Size = new Size(842, 10),
             BackColor = Color.FromArgb(55, 65, 76)
         };
@@ -143,11 +149,12 @@ internal sealed class LauncherForm : Form
         var footerLabel = new Label
         {
             AutoSize = true,
-            Location = new Point(34, 511),
+            Location = new Point(34, 516),
             Text = "U-CREW • u-crew.net",
             ForeColor = Color.FromArgb(195, 205, 215),
             BackColor = Color.Transparent,
-            Font = new Font("Segoe UI", 8.5f, FontStyle.Regular)
+            Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
+            UseCompatibleTextRendering = true
         };
 
         shade.Controls.Add(footerLabel);
