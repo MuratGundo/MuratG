@@ -34,7 +34,9 @@ fi
 
 for required in \
   "$SCRIPT_DIR/api/secure_patch_request.php" \
-  "$SCRIPT_DIR/api/secure_patch_download.php"; do
+  "$SCRIPT_DIR/api/secure_patch_download.php" \
+  "$SCRIPT_DIR/api/auth_v2.php" \
+  "$SCRIPT_DIR/api/login.php"; do
   if [[ ! -f "$required" ]]; then
     echo "Eksik dosya: $required"
     exit 1
@@ -61,7 +63,9 @@ install -d -o root -g root -m 0750 "$BACKUP_ROOT"
 
 for current in \
   "$API_DIR/secure_patch_request.php" \
-  "$API_DIR/secure_patch_download.php"; do
+  "$API_DIR/secure_patch_download.php" \
+  "$API_DIR/auth_v2.php" \
+  "$API_DIR/login.php"; do
   if [[ -f "$current" ]]; then
     cp -a "$current" "$BACKUP_ROOT/"
   fi
@@ -78,6 +82,16 @@ install -o www-data -g www-data -m 0640 \
   "$SCRIPT_DIR/api/secure_patch_download.php" \
   "$API_DIR/secure_patch_download.php"
 
+install -o www-data -g www-data -m 0640 \
+  "$SCRIPT_DIR/api/auth_v2.php" \
+  "$API_DIR/auth_v2.php"
+
+install -o www-data -g www-data -m 0640 \
+  "$SCRIPT_DIR/api/login.php" \
+  "$API_DIR/login.php"
+
+php -l "$API_DIR/auth_v2.php"
+php -l "$API_DIR/login.php"
 php -l "$API_DIR/secure_patch_request.php"
 php -l "$API_DIR/secure_patch_download.php"
 
