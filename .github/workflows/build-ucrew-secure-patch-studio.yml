@@ -1,0 +1,81 @@
+name: Build U-CREW Secure Patch Studio
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-ucrew-secure-patch-studio.yml"
+      - "tools/UCrewSecurePatchStudio/**"
+      - "server/UCrewSecurePatch/api/**"
+      - "server/UCrewSecurePatch/database/**"
+      - "server/UCrewSecurePatch/INSTALL_VPS.sh"
+  pull_request:
+    paths:
+      - ".github/workflows/build-ucrew-secure-patch-studio.yml"
+      - "tools/UCrewSecurePatchStudio/**"
+      - "server/UCrewSecurePatch/api/**"
+      - "server/UCrewSecurePatch/database/**"
+      - "server/UCrewSecurePatch/INSTALL_VPS.sh"
+
+jobs:
+  publish-win-x64:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore tools/UCrewSecurePatchStudio/UCrewSecurePatchStudio.csproj
+
+      - name: Publish single EXE
+        id: publish
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          dotnet publish tools/UCrewSecurePatchStudio/UCrewSecurePatchStudio.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -o publish 2>&1 | Tee-Object -FilePath build.log
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: UCREW-Secure-Patch-Studio-build-log
+          path: build.log
+          if-no-files-found: warn
+
+      - name: Stop on publish failure
+        if: steps.publish.outcome == 'failure'
+        shell: pwsh
+        run: exit 1
+
+      - name: Prepare package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path package | Out-Null
+          Copy-Item publish/UCREW-Secure-Patch-Studio.exe package/UCREW-Secure-Patch-Studio.exe
+          Copy-Item server/UCrewSecurePatch/profiles/guardians.json package/guardians_profile.json
+          Copy-Item tools/UCrewSecurePatchStudio/README.md package/KURULUM.md
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UCREW-Secure-Patch-Studio-win-x64
+          path: package
+          if-no-files-found: error

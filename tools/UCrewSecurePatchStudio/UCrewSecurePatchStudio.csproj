@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>UCREW-Secure-Patch-Studio</AssemblyName>
+    <RootNamespace>UCREW.SecurePatchStudio</RootNamespace>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <Version>0.1.0</Version>
+    <FileVersion>0.1.0.0</FileVersion>
+    <Product>U-CREW Studio - Güvenli Yama</Product>
+    <Company>U-CREW</Company>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SSH.NET" Version="2024.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\server\UCrewSecurePatch\api\secure_patch_request.php" LogicalName="ServerPayload.api.secure_patch_request.php" />
+    <EmbeddedResource Include="..\..\server\UCrewSecurePatch\api\secure_patch_download.php" LogicalName="ServerPayload.api.secure_patch_download.php" />
+    <EmbeddedResource Include="..\..\server\UCrewSecurePatch\database\INSTALL_SCHEMA.sql" LogicalName="ServerPayload.database.INSTALL_SCHEMA.sql" />
+    <EmbeddedResource Include="..\..\server\UCrewSecurePatch\INSTALL_VPS.sh" LogicalName="ServerPayload.INSTALL_VPS.sh" />
+  </ItemGroup>
+</Project>
