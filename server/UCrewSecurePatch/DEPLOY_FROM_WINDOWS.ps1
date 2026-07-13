@@ -9,17 +9,18 @@ $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $remoteName = "ucrew_secure_patch_$stamp"
-$tempZip = Join-Path $env:TEMP "$remoteName.zip"
+$tempArchive = Join-Path $env:TEMP "$remoteName.tar.gz"
 $sshTarget = "{0}@{1}" -f $SshUser, $HostName
 
 function Require-Command([string]$Name) {
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
-        throw "$Name bulunamadi. Windows Ayarlar > Istega Bagli Ozellikler bolumunden OpenSSH Client kurulu olmalidir."
+        throw "$Name bulunamadi. Windows OpenSSH Client ve tar.exe kurulu olmalidir."
     }
 }
 
 Require-Command "ssh"
 Require-Command "scp"
+Require-Command "tar"
 
 if ($DatabaseName -notmatch '^[A-Za-z0-9_]+$') {
     throw "Veritabani adi yalnizca harf, rakam ve alt cizgi icerebilir."
@@ -31,35 +32,39 @@ Write-Host "Sunucu    : $sshTarget"
 Write-Host "Veritabani: $DatabaseName"
 Write-Host ""
 
-if (Test-Path -LiteralPath $tempZip) {
-    Remove-Item -LiteralPath $tempZip -Force
+if (Test-Path -LiteralPath $tempArchive) {
+    Remove-Item -LiteralPath $tempArchive -Force
 }
-
-$items = Get-ChildItem -LiteralPath $scriptRoot -Force |
-    Where-Object { $_.Name -notin @("DEPLOY_FROM_WINDOWS.ps1", "DEPLOY_FROM_WINDOWS.bat") }
-
-if (-not $items) {
-    throw "Kurulum paketinde gonderilecek dosya bulunamadi."
-}
-
-Compress-Archive -Path $items.FullName -DestinationPath $tempZip -CompressionLevel Optimal -Force
 
 try {
+    Write-Host "[0/5] Linux uyumlu kurulum arsivi hazirlaniyor..." -ForegroundColor Cyan
+
+    Push-Location $scriptRoot
+    try {
+        & tar.exe -czf $tempArchive `
+            --exclude=DEPLOY_FROM_WINDOWS.ps1 `
+            --exclude=DEPLOY_FROM_WINDOWS.bat `
+            .
+        if ($LASTEXITCODE -ne 0) {
+            throw "TAR arsivi olusturulamadi. Kod: $LASTEXITCODE"
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
     Write-Host "[1/5] Paket VPS'e yukleniyor..." -ForegroundColor Cyan
-    & scp $tempZip ("{0}:/root/{1}.zip" -f $sshTarget, $remoteName)
+    & scp $tempArchive ("{0}:/root/{1}.tar.gz" -f $sshTarget, $remoteName)
     if ($LASTEXITCODE -ne 0) {
         throw "SCP yukleme basarisiz. Kod: $LASTEXITCODE"
     }
 
     Write-Host "[2/5] Sunucu dosyalari kuruluyor..." -ForegroundColor Cyan
-
-    # Windows PowerShell 5.1 indented here-string kapanisini desteklemez.
-    # Bu nedenle uzak komutlar dizi olarak olusturulup tek satirda birlestirilir.
     $remoteInstall = @(
         "set -e",
         "rm -rf /root/$remoteName",
         "mkdir -p /root/$remoteName",
-        "unzip -oq /root/$remoteName.zip -d /root/$remoteName",
+        "tar -xzf /root/$remoteName.tar.gz -C /root/$remoteName",
         "chmod +x /root/$remoteName/INSTALL_VPS.sh",
         "bash /root/$remoteName/INSTALL_VPS.sh"
     ) -join "; "
@@ -100,7 +105,7 @@ try {
     Write-Host "Sonraki adim: tools\UCREW_SECURE_PATCH_PACK.bat ile ilk .ucp paketini uret." -ForegroundColor Yellow
 }
 finally {
-    if (Test-Path -LiteralPath $tempZip) {
-        Remove-Item -LiteralPath $tempZip -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $tempArchive) {
+        Remove-Item -LiteralPath $tempArchive -Force -ErrorAction SilentlyContinue
     }
 }
