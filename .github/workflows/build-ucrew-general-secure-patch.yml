@@ -1,0 +1,69 @@
+name: Build U-CREW General Secure Patch System
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-ucrew-general-secure-patch.yml"
+      - "server/UCrewSecurePatch/**"
+  pull_request:
+    paths:
+      - ".github/workflows/build-ucrew-general-secure-patch.yml"
+      - "server/UCrewSecurePatch/**"
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate PHP syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l server/UCrewSecurePatch/api/secure_patch_request.php
+          php -l server/UCrewSecurePatch/api/secure_patch_download.php
+
+      - name: Validate PowerShell 5.1 script syntax
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "server/UCrewSecurePatch/tools/UCREW_SECURE_PATCH_PACK_PS51.ps1",
+            [ref]$null,
+            [ref]$errors
+          ) | Out-Null
+
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+
+      - name: Prepare universal package
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="package/UCREW_Genel_Guvenli_Yama_Sistemi"
+          mkdir -p "$package/api" "$package/database" "$package/tools" "$package/profiles"
+
+          cp server/UCrewSecurePatch/api/secure_patch_request.php "$package/api/"
+          cp server/UCrewSecurePatch/api/secure_patch_download.php "$package/api/"
+          cp server/UCrewSecurePatch/database/INSTALL_SCHEMA.sql "$package/database/"
+          cp server/UCrewSecurePatch/tools/UCREW_SECURE_PATCH_PACK_PS51.ps1 "$package/tools/"
+          cp server/UCrewSecurePatch/tools/UCREW_SECURE_PATCH_PACK.bat "$package/tools/"
+          cp server/UCrewSecurePatch/profiles/profile.schema.json "$package/profiles/"
+          cp server/UCrewSecurePatch/profiles/guardians.json "$package/profiles/"
+          cp server/UCrewSecurePatch/INSTALL_VPS.sh "$package/"
+          cp server/UCrewSecurePatch/KURULUM.txt "$package/"
+          cp server/UCrewSecurePatch/README.md "$package/"
+
+          chmod +x "$package/INSTALL_VPS.sh"
+
+      - name: Upload universal system
+        uses: actions/upload-artifact@v4
+        with:
+          name: UCREW-Genel-Guvenli-Yama-Sistemi
+          path: package/UCREW_Genel_Guvenli_Yama_Sistemi
+          if-no-files-found: error
