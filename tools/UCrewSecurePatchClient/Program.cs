@@ -31,8 +31,9 @@ internal static class Program
                 return;
             }
 
-            using (var loginForm = new LoginForm(config))
+            if (!TokenProvider.TryUseSavedSecurePatchSession())
             {
+                using var loginForm = new LoginForm(config);
                 if (loginForm.ShowDialog() != DialogResult.OK)
                 {
                     return;
