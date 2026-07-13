@@ -1,0 +1,53 @@
+name: Build U-CREW Secure Patch Client
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-ucrew-secure-patch-client.yml"
+      - "tools/UCrewSecurePatchClient/**"
+  pull_request:
+    paths:
+      - ".github/workflows/build-ucrew-secure-patch-client.yml"
+      - "tools/UCrewSecurePatchClient/**"
+
+jobs:
+  publish-win-x64:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish universal client
+        shell: pwsh
+        run: |
+          dotnet publish tools/UCrewSecurePatchClient/UCrewSecurePatchClient.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -o publish
+
+      - name: Prepare package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path package | Out-Null
+          Copy-Item publish/UCREW_SecurePatch.exe package/UCREW_SecurePatch.exe
+          Copy-Item tools/UCrewSecurePatchClient/ucrew_game.sample.json package/ucrew_game.json
+          Copy-Item tools/UCrewSecurePatchClient/README.md package/KURULUM.md
+          Copy-Item server/UCrewSecurePatch/profiles/guardians.json package/guardians_server_profile.json
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UCREW-Genel-Guvenli-Yama-Istemcisi-win-x64
+          path: package
+          if-no-files-found: error
