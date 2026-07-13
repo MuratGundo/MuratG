@@ -11,6 +11,7 @@ internal sealed class ClientConfig
     public string Channel { get; set; } = "stable";
     public string GameRoot { get; set; } = ".";
     public string GameExe { get; set; } = "";
+    public string[] GameExecutables { get; set; } = Array.Empty<string>();
     public string[] GameArguments { get; set; } = Array.Empty<string>();
     public string LogoPath { get; set; } = "ucrew-logo.png";
     public string BackgroundPath { get; set; } = "ucrew-background.jpg";
@@ -86,6 +87,9 @@ internal sealed class RuntimeProfile
 
     [JsonPropertyName("game_exe")]
     public string GameExe { get; set; } = "";
+
+    [JsonPropertyName("game_exes")]
+    public string[] GameExecutables { get; set; } = Array.Empty<string>();
 
     [JsonPropertyName("install_mode")]
     public string InstallMode { get; set; } = "overlay_tree";
