@@ -403,15 +403,22 @@ internal sealed class PatchRuntime
         for (int depth = 0; directory is not null && depth < 10; depth++, directory = directory.Parent)
         {
             roots.Add(directory.FullName);
-            foreach (string candidate in candidates)
+        }
+
+        // Profildeki sıra önemlidir: Game Pass gamelaunchhelper.exe seçeneği,
+        // yakındaki doğrudan Shipping.exe seçeneğinden önce aranmalıdır.
+        foreach (string candidate in candidates)
+        {
+            foreach (string root in roots)
             {
                 try
                 {
-                    string executable = FileSystemUtil.ResolveSafePath(directory.FullName, candidate);
+                    string executable = FileSystemUtil.ResolveSafePath(root, candidate);
                     if (File.Exists(executable))
                     {
-                        _log("Oyun ana klasörü bulundu: " + directory.FullName);
-                        return directory.FullName;
+                        _log("Oyun ana klasörü bulundu: " + root);
+                        _log("Seçilen oyun başlatıcısı: " + executable);
+                        return root;
                     }
                 }
                 catch (InvalidDataException)
