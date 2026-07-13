@@ -1,0 +1,300 @@
+<Window x:Class="UCREW.SecurePatchStudio.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="U-CREW Studio - Güvenli Yama"
+        Width="1220" Height="780"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        Background="{StaticResource BgBrush}">
+    <Border BorderBrush="#273441" BorderThickness="1" CornerRadius="8" Background="{StaticResource BgBrush}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="54"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="58"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Background="#0D141C" CornerRadius="8,8,0,0" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="240"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="56"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0">
+                        <TextBlock Text="U-CREW" Foreground="{StaticResource AccentBrush}" FontSize="22" FontWeight="Bold"/>
+                        <TextBlock Text=" STUDIO" Foreground="White" FontSize="22" FontWeight="SemiBold"/>
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="GENEL GÜVENLİ YAMA YÖNETİMİ" Foreground="{StaticResource MutedBrush}"
+                               VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold"/>
+                    <Button Grid.Column="2" Content="×" FontSize="24" Foreground="White" Background="Transparent"
+                            BorderThickness="0" Cursor="Hand" Click="CloseButton_Click"/>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="240"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Background="#0C1219" BorderBrush="#1D2934" BorderThickness="0,0,1,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Margin="18,18,18,10" Text="YÖNETİM" Foreground="#667788" FontSize="11" FontWeight="Bold"/>
+                        <StackPanel Grid.Row="1">
+                            <Button Style="{StaticResource NavButton}" Content="⌂  Ana Panel" Tag="0" Click="NavigationButton_Click"/>
+                            <Button Style="{StaticResource NavButton}" Content="☁  Sunucu Kurulumu" Tag="1" Click="NavigationButton_Click"/>
+                            <Button Style="{StaticResource NavButton}" Content="▤  Oyun Profilleri" Tag="2" Click="NavigationButton_Click"/>
+                            <Button Style="{StaticResource NavButton}" Content="◈  Yama Paketi" Tag="3" Click="NavigationButton_Click"/>
+                            <Button Style="{StaticResource NavButton}" Content="↑  Sunucuya Yayınla" Tag="4" Click="NavigationButton_Click"/>
+                            <Button Style="{StaticResource NavButton}" Content="≡  Günlükler" Tag="5" Click="NavigationButton_Click"/>
+                        </StackPanel>
+                        <Border Grid.Row="2" Margin="12" Padding="12" Background="#121C25" CornerRadius="5">
+                            <StackPanel>
+                                <TextBlock Text="Sistem" Foreground="{StaticResource MutedBrush}" FontSize="11"/>
+                                <TextBlock Text="Patch v3 • MySQL" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                <TextBlock Text="Eski UUM kullanılmaz" Foreground="{StaticResource AccentBrush}" FontSize="11" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <TabControl x:Name="MainTabs" Grid.Column="1" Background="Transparent" BorderThickness="0" SelectedIndex="0">
+                    <TabControl.Resources>
+                        <Style TargetType="TabItem">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                        </Style>
+                    </TabControl.Resources>
+
+                    <TabItem>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="30">
+                                <TextBlock Text="Ana Panel" FontSize="28" FontWeight="SemiBold"/>
+                                <TextBlock Text="Sunucu kurulumu, oyun profili, paket hazırlama ve yayınlama tek uygulamada." Foreground="{StaticResource MutedBrush}" Margin="0,6,0,24"/>
+                                <UniformGrid Columns="2" Rows="2">
+                                    <Border Background="{StaticResource PanelBrush}" CornerRadius="7" Padding="22" Margin="0,0,10,10">
+                                        <StackPanel>
+                                            <TextBlock Text="1" Foreground="{StaticResource AccentBrush}" FontSize="34" FontWeight="Bold"/>
+                                            <TextBlock Text="Sunucuyu Kur" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                                            <TextBlock Text="API ve MySQL şemasını VPS'e kurar." Foreground="{StaticResource MutedBrush}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Background="{StaticResource PanelBrush}" CornerRadius="7" Padding="22" Margin="10,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock Text="2" Foreground="{StaticResource AccentBrush}" FontSize="34" FontWeight="Bold"/>
+                                            <TextBlock Text="Oyun Profilini Hazırla" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                                            <TextBlock Text="Her oyun için EXE, hedef klasör ve dosya türlerini tanımlar." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Background="{StaticResource PanelBrush}" CornerRadius="7" Padding="22" Margin="0,10,10,0">
+                                        <StackPanel>
+                                            <TextBlock Text="3" Foreground="{StaticResource AccentBrush}" FontSize="34" FontWeight="Bold"/>
+                                            <TextBlock Text="Şifreli Paket Oluştur" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                                            <TextBlock Text="AES-256 .ucp, SHA-256, metadata ve SQL üretir." Foreground="{StaticResource MutedBrush}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Background="{StaticResource PanelBrush}" CornerRadius="7" Padding="22" Margin="10,10,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="4" Foreground="{StaticResource AccentBrush}" FontSize="34" FontWeight="Bold"/>
+                                            <TextBlock Text="Tek Tıkla Yayınla" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                                            <TextBlock Text="Paketi VPS'e yükler, doğrular ve veritabanına kaydeder." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Border>
+                                </UniformGrid>
+                                <Border Background="#101923" CornerRadius="7" Padding="18" Margin="0,24,0,0">
+                                    <TextBlock x:Name="DashboardStatusText" Text="Sistem hazır. Önce Sunucu Kurulumu bölümünü kullan." Foreground="{StaticResource AccentBrush}" FontSize="14"/>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="30">
+                                <TextBlock Text="Sunucu Kurulumu" FontSize="28" FontWeight="SemiBold"/>
+                                <TextBlock Text="Genel API ve MySQL şemasını SSH/SFTP ile doğrudan VPS'e kurar." Foreground="{StaticResource MutedBrush}" Margin="0,6,0,22"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                        <TextBlock Text="VPS Adresi" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="HostBox"/>
+                                        <TextBlock Text="SSH Kullanıcısı" Margin="0,14,0,5"/>
+                                        <TextBox x:Name="SshUserBox"/>
+                                        <TextBlock Text="SSH Şifresi" Margin="0,14,0,5"/>
+                                        <PasswordBox x:Name="SshPasswordBox"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                        <TextBlock Text="SSH Portu" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="PortBox"/>
+                                        <TextBlock Text="MySQL Veritabanı" Margin="0,14,0,5"/>
+                                        <TextBox x:Name="DatabaseBox"/>
+                                        <TextBlock Text="MySQL Kullanıcısı" Margin="0,14,0,5"/>
+                                        <TextBox x:Name="DatabaseUserBox"/>
+                                        <TextBlock Text="MySQL Şifresi (socket girişinde boş bırak)" Margin="0,14,0,5"/>
+                                        <PasswordBox x:Name="DatabasePasswordBox"/>
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Margin="0,24,0,0">
+                                    <Button x:Name="DeployServerButton" Style="{StaticResource PrimaryButton}" Content="Sunucuyu Kur ve Test Et" Click="DeployServerButton_Click"/>
+                                    <Button Style="{StaticResource SecondaryButton}" Content="Ayarları Kaydet" Margin="12,0,0,0" Click="SaveSettingsButton_Click"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="30">
+                                <TextBlock Text="Oyun Profilleri" FontSize="28" FontWeight="SemiBold"/>
+                                <TextBlock Text="Her oyun için yalnızca bir JSON profili hazırlanır." Foreground="{StaticResource MutedBrush}" Margin="0,6,0,20"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                        <TextBlock Text="Oyun Slug" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="ProfileSlugBox"/>
+                                        <TextBlock Text="Oyun Adı" Margin="0,14,0,5"/>
+                                        <TextBox x:Name="ProfileNameBox"/>
+                                        <TextBlock Text="Oyun EXE" Margin="0,14,0,5"/>
+                                        <TextBox x:Name="ProfileExeBox"/>
+                                        <TextBlock Text="Hedef Klasör" Margin="0,14,0,5"/>
+                                        <TextBox x:Name="ProfileTargetBox"/>
+                                        <TextBlock Text="Kurulum Modu" Margin="0,14,0,5"/>
+                                        <ComboBox x:Name="ProfileInstallModeBox">
+                                            <ComboBoxItem Content="overlay_flat"/>
+                                            <ComboBoxItem Content="overlay_tree"/>
+                                            <ComboBoxItem Content="replace_files"/>
+                                            <ComboBoxItem Content="archive_replace"/>
+                                            <ComboBoxItem Content="custom"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                        <TextBlock Text="İzin Verilen Uzantılar" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="ProfileExtensionsBox" Height="104" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+                                        <CheckBox x:Name="CleanupOnExitCheck" Content="Oyun kapanınca geçici dosyaları temizle" Foreground="White" Margin="0,16,0,0" IsChecked="True"/>
+                                        <CheckBox x:Name="PreserveTreeCheck" Content="Klasör yapısını koru" Foreground="White" Margin="0,10,0,0" IsChecked="True"/>
+                                        <CheckBox x:Name="BackupFilesCheck" Content="Mevcut dosyaları yedekle" Foreground="White" Margin="0,10,0,0" IsChecked="True"/>
+                                        <CheckBox x:Name="RequiresBootstrapCheck" Content="Oyun özel bootstrap gerektiriyor" Foreground="White" Margin="0,10,0,0"/>
+                                        <TextBlock Text="Bootstrap Türü" Margin="0,14,0,5"/>
+                                        <ComboBox x:Name="BootstrapTypeBox">
+                                            <ComboBoxItem Content="launcher"/>
+                                            <ComboBoxItem Content="version_proxy"/>
+                                            <ComboBoxItem Content="winmm_proxy"/>
+                                            <ComboBoxItem Content="none"/>
+                                            <ComboBoxItem Content="custom"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Margin="0,24,0,0">
+                                    <Button Style="{StaticResource SecondaryButton}" Content="Yeni Profil" Click="NewProfileButton_Click"/>
+                                    <Button Style="{StaticResource SecondaryButton}" Content="Profil Aç" Margin="10,0,0,0" Click="LoadProfileButton_Click"/>
+                                    <Button Style="{StaticResource PrimaryButton}" Content="Profili Kaydet" Margin="10,0,0,0" Click="SaveProfileButton_Click"/>
+                                </StackPanel>
+                                <TextBlock x:Name="CurrentProfilePathText" Foreground="{StaticResource MutedBrush}" Margin="0,14,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="30">
+                                <TextBlock Text="Yama Paketi" FontSize="28" FontWeight="SemiBold"/>
+                                <TextBlock Text="Yama klasöründen veya ZIP'ten şifreli .ucp paketi oluşturur." Foreground="{StaticResource MutedBrush}" Margin="0,6,0,22"/>
+                                <TextBlock Text="Profil JSON" Margin="0,0,0,5"/>
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions>
+                                    <TextBox x:Name="BuildProfilePathBox"/>
+                                    <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Seç" Margin="10,0,0,0" Click="SelectBuildProfileButton_Click"/>
+                                </Grid>
+                                <TextBlock Text="Yama Kaynağı (klasör veya ZIP)" Margin="0,14,0,5"/>
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="110"/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions>
+                                    <TextBox x:Name="BuildSourcePathBox"/>
+                                    <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Klasör" Margin="10,0,0,0" Click="SelectSourceFolderButton_Click"/>
+                                    <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="ZIP" Margin="10,0,0,0" Click="SelectSourceZipButton_Click"/>
+                                </Grid>
+                                <TextBlock Text="Çıktı Klasörü" Margin="0,14,0,5"/>
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions>
+                                    <TextBox x:Name="BuildOutputPathBox"/>
+                                    <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Seç" Margin="10,0,0,0" Click="SelectOutputFolderButton_Click"/>
+                                </Grid>
+                                <Grid Margin="0,14,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                        <TextBlock Text="Yama Sürümü" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="BuildVersionBox" Text="1.0.0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                        <TextBlock Text="Yayın Kanalı" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="BuildChannelBox" Text="stable"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Button x:Name="BuildPackageButton" Style="{StaticResource PrimaryButton}" Content="Şifreli Paketi Oluştur" HorizontalAlignment="Left" Margin="0,24,0,0" Click="BuildPackageButton_Click"/>
+                                <Border Background="#101923" CornerRadius="6" Padding="15" Margin="0,18,0,0">
+                                    <TextBlock x:Name="BuildResultText" Text="Henüz paket oluşturulmadı." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="30">
+                                <TextBlock Text="Sunucuya Yayınla" FontSize="28" FontWeight="SemiBold"/>
+                                <TextBlock Text="Metadata dosyasını seç; .ucp ve SQL aynı klasörden otomatik bulunur." Foreground="{StaticResource MutedBrush}" Margin="0,6,0,22"/>
+                                <TextBlock Text="Metadata JSON" Margin="0,0,0,5"/>
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions>
+                                    <TextBox x:Name="PublishMetadataPathBox"/>
+                                    <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Seç" Margin="10,0,0,0" Click="SelectMetadataButton_Click"/>
+                                </Grid>
+                                <Border Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Sunucu Bilgileri" FontSize="16" FontWeight="SemiBold"/>
+                                        <TextBlock x:Name="PublishServerSummaryText" Foreground="{StaticResource MutedBrush}" Margin="0,7,0,0" TextWrapping="Wrap"/>
+                                        <TextBlock Text="Şifreler Sunucu Kurulumu bölümündeki kutulardan alınır ve kaydedilmez." Foreground="{StaticResource AccentBrush}" Margin="0,7,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                                <Button x:Name="PublishButton" Style="{StaticResource PrimaryButton}" Content="Paketi Yükle ve Yayınla" HorizontalAlignment="Left" Margin="0,24,0,0" Click="PublishButton_Click"/>
+                                <Border Background="#101923" CornerRadius="6" Padding="15" Margin="0,18,0,0">
+                                    <TextBlock x:Name="PublishResultText" Text="Henüz yayın yapılmadı." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem>
+                        <Grid Margin="30">
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Günlükler" FontSize="28" FontWeight="SemiBold"/>
+                                <TextBlock Text="Sunucu, paketleme ve yayınlama işlemlerinin ayrıntıları." Foreground="{StaticResource MutedBrush}" Margin="0,6,0,18"/>
+                            </StackPanel>
+                            <TextBox x:Name="LogTextBox" Grid.Row="1" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12"/>
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,14,0,0">
+                                <Button Style="{StaticResource SecondaryButton}" Content="Yenile" Click="RefreshLogsButton_Click"/>
+                                <Button Style="{StaticResource SecondaryButton}" Content="Günlüğü Aç" Margin="10,0,0,0" Click="OpenLogButton_Click"/>
+                                <Button Style="{StaticResource SecondaryButton}" Content="Temizle" Margin="10,0,0,0" Click="ClearLogsButton_Click"/>
+                            </StackPanel>
+                        </Grid>
+                    </TabItem>
+                </TabControl>
+            </Grid>
+
+            <Border Grid.Row="2" Background="#0D141C" CornerRadius="0,0,8,8" BorderBrush="#1D2934" BorderThickness="0,1,0,0">
+                <Grid Margin="18,10">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="150"/></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock x:Name="GlobalStatusText" Text="Hazır" FontWeight="SemiBold"/>
+                        <ProgressBar x:Name="GlobalProgressBar" Height="8" Margin="0,8,18,0" Minimum="0" Maximum="100" Value="0"
+                                     Foreground="{StaticResource AccentBrush}" Background="#24313D"/>
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="U-CREW Studio 0.1" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
