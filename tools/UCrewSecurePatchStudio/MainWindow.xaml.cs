@@ -1,5 +1,8 @@
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
+using System.Text;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -196,6 +199,30 @@ public partial class MainWindow : Window
         }
     }
 
+    private void SelectProfileLogoButton_Click(object sender, RoutedEventArgs e)
+    {
+        SelectImageInto(ProfileLogoPathBox, "U-CREW logosunu seç");
+    }
+
+    private void SelectProfileBackgroundButton_Click(object sender, RoutedEventArgs e)
+    {
+        SelectImageInto(ProfileBackgroundPathBox, "Uygulama arka planını seç");
+    }
+
+    private void SelectImageInto(TextBox target, string title)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = title,
+            Filter = "Resim dosyaları (*.png;*.jpg;*.jpeg;*.webp;*.bmp)|*.png;*.jpg;*.jpeg;*.webp;*.bmp"
+        };
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            target.Text = dialog.FileName;
+        }
+    }
+
     private void SelectBuildProfileButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog
@@ -296,6 +323,122 @@ public partial class MainWindow : Window
                     "U-CREW Studio",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
+            });
+    }
+
+    private void SelectClientExeButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Genel U-CREW güvenli yama istemcisini seç",
+            Filter = "U-CREW güvenli istemci (UCREW_SecurePatch.exe)|UCREW_SecurePatch.exe|EXE (*.exe)|*.exe"
+        };
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            ClientExePathBox.Text = dialog.FileName;
+        }
+    }
+
+    private async void BuildClientPackageButton_Click(object sender, RoutedEventArgs e)
+    {
+        await RunOperationAsync(
+            BuildClientPackageButton,
+            "Oyuna özel yama uygulaması hazırlanıyor...",
+            async (progress, token) =>
+            {
+                string profilePath = Path.GetFullPath(BuildProfilePathBox.Text.Trim());
+                string clientExePath = Path.GetFullPath(ClientExePathBox.Text.Trim());
+                string outputRoot = Path.GetFullPath(BuildOutputPathBox.Text.Trim());
+
+                if (!File.Exists(profilePath))
+                    throw new FileNotFoundException("Önce kaydedilmiş oyun profilini seçin.", profilePath);
+                if (!File.Exists(clientExePath))
+                    throw new FileNotFoundException("UCREW_SecurePatch.exe dosyasını seçin.", clientExePath);
+
+                GameProfile profile = _profileService.Load(profilePath);
+                string logoPath = profile.Theme?.Logo ?? string.Empty;
+                string backgroundPath = profile.Theme?.Background ?? string.Empty;
+
+                if (!File.Exists(logoPath))
+                    throw new FileNotFoundException("Profilde seçilen logo bulunamadı.", logoPath);
+                if (!File.Exists(backgroundPath))
+                    throw new FileNotFoundException("Profilde seçilen arka plan bulunamadı.", backgroundPath);
+
+                Directory.CreateDirectory(outputRoot);
+                string staging = Path.Combine(
+                    Path.GetTempPath(),
+                    "UCREW_CLIENT_" + Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(staging);
+
+                try
+                {
+                    progress.Report(20);
+                    string logoName = "ucrew-logo" + Path.GetExtension(logoPath).ToLowerInvariant();
+                    string backgroundName = "game-background" + Path.GetExtension(backgroundPath).ToLowerInvariant();
+
+                    File.Copy(clientExePath, Path.Combine(staging, "UCREW_SecurePatch.exe"), true);
+                    File.Copy(logoPath, Path.Combine(staging, logoName), true);
+                    File.Copy(backgroundPath, Path.Combine(staging, backgroundName), true);
+
+                    var gameConfig = new
+                    {
+                        Enabled = true,
+                        ApiBase = "https://api.u-crew.net/api/",
+                        FallbackApiBase = "",
+                        GameSlug = profile.GameSlug,
+                        Channel = string.IsNullOrWhiteSpace(BuildChannelBox.Text)
+                            ? "stable"
+                            : BuildChannelBox.Text.Trim(),
+                        GameRoot = ".",
+                        GameExe = profile.GameExe,
+                        GameArguments = Array.Empty<string>(),
+                        LogoPath = logoName,
+                        BackgroundPath = backgroundName,
+                        WindowTitle = "U-CREW " + profile.GameName + " Türkçe Yama",
+                        HideRuntimeFiles = true,
+                        CloseWindowWhenGameStarts = true
+                    };
+
+                    File.WriteAllText(
+                        Path.Combine(staging, "ucrew_game.json"),
+                        JsonSerializer.Serialize(gameConfig, new JsonSerializerOptions { WriteIndented = true }),
+                        new UTF8Encoding(false));
+                    File.WriteAllText(
+                        Path.Combine(staging, "KURULUM.txt"),
+                        "UCREW_SecurePatch.exe, ucrew_game.json, logo ve arka plan dosyalarını " +
+                        profile.GameExe + " dosyasının bulunduğu oyun klasörüne kopyalayın." +
+                        Environment.NewLine + "Ardından UCREW_SecurePatch.exe dosyasını çalıştırın.",
+                        new UTF8Encoding(false));
+
+                    progress.Report(65);
+                    string zipPath = Path.Combine(
+                        outputRoot,
+                        "UCREW_" + profile.GameSlug + "_Guvenli_Yama_Uygulamasi.zip");
+                    if (File.Exists(zipPath))
+                        File.Delete(zipPath);
+
+                    await Task.Run(
+                        () => ZipFile.CreateFromDirectory(
+                            staging,
+                            zipPath,
+                            CompressionLevel.Optimal,
+                            includeBaseDirectory: false),
+                        token);
+
+                    progress.Report(100);
+                    ClientPackageResultText.Text = "Hazır: " + zipPath;
+                    MessageBox.Show(
+                        "Oyuna özel U-CREW yama uygulaması başarıyla oluşturuldu.",
+                        "U-CREW Studio",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                finally
+                {
+                    if (Directory.Exists(staging))
+                        Directory.Delete(staging, true);
+                }
             });
     }
 
@@ -478,7 +621,12 @@ public partial class MainWindow : Window
             RequiresBootstrap = RequiresBootstrapCheck.IsChecked == true,
             BootstrapType = GetComboValue(BootstrapTypeBox),
             WaitForGameExit = true,
-            Theme = new ProfileTheme()
+            Theme = new ProfileTheme
+            {
+                Logo = ProfileLogoPathBox.Text.Trim(),
+                Background = ProfileBackgroundPathBox.Text.Trim(),
+                Accent = "#55ff00"
+            }
         };
 
         StudioValidation.ValidateProfile(profile);
@@ -496,6 +644,8 @@ public partial class MainWindow : Window
         PreserveTreeCheck.IsChecked = profile.PreserveDirectoryTree;
         BackupFilesCheck.IsChecked = profile.BackupExistingFiles;
         RequiresBootstrapCheck.IsChecked = profile.RequiresBootstrap;
+        ProfileLogoPathBox.Text = profile.Theme?.Logo ?? string.Empty;
+        ProfileBackgroundPathBox.Text = profile.Theme?.Background ?? string.Empty;
         SetComboValue(ProfileInstallModeBox, profile.InstallMode);
         SetComboValue(BootstrapTypeBox, profile.BootstrapType);
     }
