@@ -1,0 +1,1 @@
+U-CREW genel güvenli yama sistemi tek tık VPS kurulum paketi doğrulaması.
