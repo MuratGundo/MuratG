@@ -66,6 +66,34 @@ internal static class ConfigLoader
         return files.TryGetValue(name, out bytes!);
     }
 
+    public static bool TryLoadEmbeddedRuntimeProfile(out RuntimeProfile profile)
+    {
+        profile = new RuntimeProfile();
+
+        if (!TryReadEmbeddedFile("ucrew_profile.json", out byte[] bytes))
+        {
+            return false;
+        }
+
+        try
+        {
+            RuntimeProfile? embedded = JsonSerializer.Deserialize<RuntimeProfile>(
+                Encoding.UTF8.GetString(bytes),
+                JsonOptions);
+            if (embedded is null)
+            {
+                return false;
+            }
+
+            profile = embedded;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static string ResolveAssetPath(ClientConfig config, string path)
     {
         if (string.IsNullOrWhiteSpace(path))
