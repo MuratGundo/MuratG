@@ -204,6 +204,73 @@ internal sealed class PatchRuntime
                ?? throw new InvalidOperationException("Oyun başlatılamadı.");
     }
 
+    public async Task WaitForGameExitAsync(
+        Process launchedProcess,
+        RuntimeProfile profile,
+        CancellationToken cancellationToken)
+    {
+        string launchedName = launchedProcess.ProcessName;
+        bool isHelper = launchedName.Contains("gamelaunchhelper", StringComparison.OrdinalIgnoreCase);
+
+        if (!isHelper)
+        {
+            _log("Oyun işlemi takip ediliyor: " + launchedName);
+            await launchedProcess.WaitForExitAsync(cancellationToken);
+            return;
+        }
+
+        _log("Game Pass başlatıcısı çalıştı; gerçek oyun işlemi bekleniyor.");
+        await launchedProcess.WaitForExitAsync(cancellationToken);
+
+        string[] processNames = GetExecutableCandidates(profile)
+            .Select(Path.GetFileNameWithoutExtension)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Where(name => !name.Contains("gamelaunchhelper", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        DateTime timeout = DateTime.UtcNow.AddSeconds(90);
+        while (DateTime.UtcNow < timeout)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            foreach (string processName in processNames)
+            {
+                Process[] matches = Process.GetProcessesByName(processName);
+                try
+                {
+                    Process? gameProcess = matches
+                        .Where(process => !process.HasExited)
+                        .OrderByDescending(process =>
+                        {
+                            try { return process.StartTime; }
+                            catch { return DateTime.MinValue; }
+                        })
+                        .FirstOrDefault();
+
+                    if (gameProcess is not null)
+                    {
+                        _log("Gerçek oyun işlemi bulundu: " + gameProcess.ProcessName);
+                        await gameProcess.WaitForExitAsync(cancellationToken);
+                        return;
+                    }
+                }
+                finally
+                {
+                    foreach (Process process in matches)
+                    {
+                        process.Dispose();
+                    }
+                }
+            }
+
+            await Task.Delay(500, cancellationToken);
+        }
+
+        throw new InvalidOperationException(
+            "Game Pass başlatıcısı açıldı ancak gerçek Wuchang oyun işlemi 90 saniye içinde bulunamadı.");
+    }
+
     public void CleanupActiveSession()
     {
         if (!File.Exists(_activeSessionPath))
