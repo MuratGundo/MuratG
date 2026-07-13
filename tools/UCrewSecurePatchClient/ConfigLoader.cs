@@ -111,6 +111,11 @@ internal static class ConfigLoader
 
         string gameRootValue = string.IsNullOrWhiteSpace(config.GameRoot) ? "." : config.GameRoot.Trim();
         config.GameRoot = Path.GetFullPath(Path.Combine(configDirectory, gameRootValue));
+        config.GameExecutables = (config.GameExecutables ?? Array.Empty<string>())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         config.GameArguments ??= Array.Empty<string>();
 
         return config;
