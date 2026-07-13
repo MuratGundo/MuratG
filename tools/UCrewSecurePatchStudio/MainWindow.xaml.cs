@@ -395,6 +395,7 @@ public partial class MainWindow : Window
                             : BuildChannelBox.Text.Trim(),
                         GameRoot = ".",
                         GameExe = profile.GameExe,
+                        GameExecutables = profile.GameExecutables,
                         GameArguments = Array.Empty<string>(),
                         LogoPath = logoName,
                         BackgroundPath = backgroundName,
@@ -647,11 +648,19 @@ public partial class MainWindow : Window
 
     private GameProfile ReadProfileFromUi()
     {
+        string[] executableCandidates = ProfileExeBox.Text
+            .Split(new[] { '\r', '\n', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(value => value.Trim())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
         var profile = new GameProfile
         {
             GameSlug = ProfileSlugBox.Text.Trim(),
             GameName = ProfileNameBox.Text.Trim(),
-            GameExe = ProfileExeBox.Text.Trim(),
+            GameExe = executableCandidates.FirstOrDefault() ?? string.Empty,
+            GameExecutables = executableCandidates,
             TargetPath = ProfileTargetBox.Text.Trim(),
             InstallMode = GetComboValue(ProfileInstallModeBox),
             AllowedExtensions = ProfileExtensionsBox.Text
@@ -678,7 +687,12 @@ public partial class MainWindow : Window
     {
         ProfileSlugBox.Text = profile.GameSlug;
         ProfileNameBox.Text = profile.GameName;
-        ProfileExeBox.Text = profile.GameExe;
+        ProfileExeBox.Text = string.Join(
+            "; ",
+            (profile.GameExecutables is { Length: > 0 }
+                ? profile.GameExecutables
+                : new[] { profile.GameExe })
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
         ProfileTargetBox.Text = profile.TargetPath;
         ProfileExtensionsBox.Text = string.Join(Environment.NewLine, profile.AllowedExtensions);
         CleanupOnExitCheck.IsChecked = profile.CleanupOnExit;
