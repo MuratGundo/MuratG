@@ -1,0 +1,37 @@
+U-CREW GENEL GÜVENLİ YAMA SİSTEMİ
+
+Bu sistem tek bir oyuna özel değildir. Bütün oyunlar aynı API ve veritabanı tablolarını kullanır.
+Her oyun yalnızca profiles klasöründe bir JSON profil tanımlar.
+
+SUNUCU KURULUMU
+1. Paketi VPS'e yükle ve çıkar.
+2. sudo bash INSTALL_VPS.sh
+3. database/INSTALL_SCHEMA.sql dosyasını yeni MySQL veritabanında çalıştır.
+
+OYUN EKLEME
+1. profiles/guardians.json dosyasını kopyala.
+2. game_slug, game_name, game_exe, target_path ve allowed_extensions alanlarını oyuna göre düzenle.
+3. Panelde games.slug değerinin profil içindeki game_slug ile aynı olduğunu doğrula.
+4. tools/UCREW_SECURE_PATCH_PACK.bat dosyasını çalıştır.
+5. Profil JSON'unu seç.
+6. Yama ZIP'ini veya yama klasörünü seç.
+7. Oluşan .ucp dosyasını sunucuda secure_patches/<game_slug>/ klasörüne yükle.
+8. Oluşan *_REGISTER.sql dosyasını yeni MySQL veritabanında çalıştır.
+
+DESTEKLENEN KURULUM MODLARI
+overlay_flat   : Paketteki dosyaları hedef klasörün köküne düz biçimde kurar.
+overlay_tree   : Paket klasör yapısını hedef klasörde korur.
+replace_files  : Belirtilen oyun dosyalarını oyun süresince değiştirir ve yedekler.
+archive_replace: Büyük arşiv dosyalarını sürüm doğrulamasıyla değiştirir.
+custom         : Oyun özelinde ayrı adaptör gerektirir.
+
+GÜVENLİK
+- Paket AES-256-CBC ile şifrelenir.
+- Şifreli paket SHA-256 ile doğrulanır.
+- İndirme bileti kısa ömürlü ve tek kullanımlıktır.
+- Kullanıcı lisansı yeni MySQL users/games/licenses sistemiyle kontrol edilir.
+- Eski UUM/SQLite sistemi kullanılmaz.
+- Açık yama dosyaları yalnızca oyun çalışırken kurulur ve oyun kapanınca temizlenebilir.
+
+İLK PROFİL
+profiles/guardians.json

@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "U-CREW Secure Patch Runtime Profile",
+  "type": "object",
+  "required": [
+    "game_slug",
+    "game_name",
+    "game_exe",
+    "install_mode",
+    "target_path",
+    "allowed_extensions",
+    "cleanup_on_exit"
+  ],
+  "properties": {
+    "game_slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{1,99}$"
+    },
+    "game_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "game_exe": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 260
+    },
+    "install_mode": {
+      "type": "string",
+      "enum": [
+        "overlay_flat",
+        "overlay_tree",
+        "replace_files",
+        "archive_replace",
+        "custom"
+      ]
+    },
+    "target_path": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "allowed_extensions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^\\.[A-Za-z0-9]+$"
+      }
+    },
+    "cleanup_on_exit": {
+      "type": "boolean"
+    },
+    "preserve_directory_tree": {
+      "type": "boolean",
+      "default": true
+    },
+    "requires_bootstrap": {
+      "type": "boolean",
+      "default": false
+    },
+    "bootstrap_type": {
+      "type": "string",
+      "enum": [
+        "none",
+        "version_proxy",
+        "winmm_proxy",
+        "launcher",
+        "custom"
+      ],
+      "default": "launcher"
+    },
+    "wait_for_game_exit": {
+      "type": "boolean",
+      "default": true
+    },
+    "backup_existing_files": {
+      "type": "boolean",
+      "default": true
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "logo": { "type": "string" },
+        "background": { "type": "string" },
+        "accent": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}
