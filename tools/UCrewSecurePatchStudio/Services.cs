@@ -715,6 +715,7 @@ internal sealed class ServerDeploymentService
 
                 string installOutput = Execute(
                     ssh,
+                    $"sed -i 's/\\r$//' {StudioValidation.ShellQuote(remoteRoot + "/INSTALL_VPS.sh")} && " +
                     $"chmod +x {StudioValidation.ShellQuote(remoteRoot + "/INSTALL_VPS.sh")} && " +
                     $"bash {StudioValidation.ShellQuote(remoteRoot + "/INSTALL_VPS.sh")}");
                 _logger.Write(installOutput.Trim());
