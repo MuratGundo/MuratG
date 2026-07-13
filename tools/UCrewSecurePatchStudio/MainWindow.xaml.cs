@@ -593,6 +593,8 @@ public partial class MainWindow : Window
         SshUserBox.Text = _settings.SshUser;
         DatabaseBox.Text = _settings.DatabaseName;
         DatabaseUserBox.Text = _settings.DatabaseUser;
+        SshPasswordBox.Password = _settingsService.UnprotectSecret(_settings.EncryptedSshPassword);
+        DatabasePasswordBox.Password = _settingsService.UnprotectSecret(_settings.EncryptedDatabasePassword);
         BuildProfilePathBox.Text = _settings.LastProfilePath;
         BuildSourcePathBox.Text = _settings.LastSourcePath;
         BuildOutputPathBox.Text = _settings.LastOutputPath;
@@ -606,6 +608,12 @@ public partial class MainWindow : Window
         _settings.SshUser = SshUserBox.Text.Trim();
         _settings.DatabaseName = DatabaseBox.Text.Trim();
         _settings.DatabaseUser = DatabaseUserBox.Text.Trim();
+
+        if (!string.IsNullOrEmpty(SshPasswordBox.Password))
+            _settings.EncryptedSshPassword = _settingsService.ProtectSecret(SshPasswordBox.Password);
+        if (!string.IsNullOrEmpty(DatabasePasswordBox.Password))
+            _settings.EncryptedDatabasePassword = _settingsService.ProtectSecret(DatabasePasswordBox.Password);
+
         StudioValidation.ValidateServerSettings(_settings);
         UpdatePublishSummary();
     }
