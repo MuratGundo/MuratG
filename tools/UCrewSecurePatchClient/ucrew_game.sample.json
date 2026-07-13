@@ -1,0 +1,15 @@
+{
+  "Enabled": true,
+  "ApiBase": "https://api.u-crew.net/api/",
+  "FallbackApiBase": "https://www.u-crew.net/ucrew_patch_v3/api/",
+  "GameSlug": "guardians",
+  "Channel": "stable",
+  "GameRoot": ".",
+  "GameExe": "Guardians.exe",
+  "GameArguments": [],
+  "LogoPath": "ucrew-logo.png",
+  "BackgroundPath": "guardians-background.jpg",
+  "WindowTitle": "U-CREW Guardians Türkçe Yama",
+  "HideRuntimeFiles": true,
+  "CloseWindowWhenGameStarts": true
+}
