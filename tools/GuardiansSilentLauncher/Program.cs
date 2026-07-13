@@ -23,6 +23,9 @@ internal static class Program
         }
 
         ApplicationConfiguration.Initialize();
-        Application.Run(new LauncherForm(args));
+
+        var form = new LauncherForm(args);
+        LauncherLayoutFix.Apply(form);
+        Application.Run(form);
     }
 }
