@@ -1,1 +1,2 @@
 U-CREW genel güvenli yama istemcisi win-x64 derleme doğrulaması.
+CI doğrulama dalı.
