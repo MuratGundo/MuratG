@@ -55,7 +55,7 @@ internal sealed class LauncherForm : Form
         AutoScaleMode = AutoScaleMode.Dpi;
 
         string backgroundPath = ConfigLoader.ResolveAssetPath(config, config.BackgroundPath);
-        BackgroundImage = LoadImageUnlocked(backgroundPath);
+        BackgroundImage = LoadImageUnlocked(config, backgroundPath);
         BackgroundImageLayout = ImageLayout.Stretch;
 
         var shade = new GradientShadePanel
@@ -72,7 +72,7 @@ internal sealed class LauncherForm : Form
             Size = new Size(360, 74),
             BackColor = Color.Transparent,
             SizeMode = PictureBoxSizeMode.Zoom,
-            Image = LoadImageUnlocked(logoPath)
+            Image = LoadImageUnlocked(config, logoPath)
         };
         shade.Controls.Add(logo);
 
@@ -345,15 +345,22 @@ internal sealed class LauncherForm : Form
         FileSystemUtil.SetHiddenSystem(_privateRoot);
     }
 
-    private static Image? LoadImageUnlocked(string path)
+    private static Image? LoadImageUnlocked(ClientConfig config, string path)
     {
-        if (!File.Exists(path))
-        {
-            return null;
-        }
-
         try
         {
+            if (ConfigLoader.TryReadEmbeddedFile(path, out byte[] embeddedBytes))
+            {
+                using var memory = new MemoryStream(embeddedBytes, writable: false);
+                using Image embeddedImage = Image.FromStream(memory);
+                return new Bitmap(embeddedImage);
+            }
+
+            if (!File.Exists(path))
+            {
+                return null;
+            }
+
             using var stream = new FileStream(
                 path,
                 FileMode.Open,
