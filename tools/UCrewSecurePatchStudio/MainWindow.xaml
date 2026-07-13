@@ -188,6 +188,18 @@
                                             <ComboBoxItem Content="none"/>
                                             <ComboBoxItem Content="custom"/>
                                         </ComboBox>
+                                        <TextBlock Text="U-CREW Logo" Margin="0,14,0,5"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions>
+                                            <TextBox x:Name="ProfileLogoPathBox"/>
+                                            <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Resim Seç" Margin="10,0,0,0" Click="SelectProfileLogoButton_Click"/>
+                                        </Grid>
+                                        <TextBlock Text="Uygulama Arka Planı" Margin="0,14,0,5"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions>
+                                            <TextBox x:Name="ProfileBackgroundPathBox"/>
+                                            <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Resim Seç" Margin="10,0,0,0" Click="SelectProfileBackgroundButton_Click"/>
+                                        </Grid>
                                     </StackPanel>
                                 </Grid>
                                 <StackPanel Orientation="Horizontal" Margin="0,24,0,0">
@@ -233,6 +245,20 @@
                                     </StackPanel>
                                 </Grid>
                                 <Button x:Name="BuildPackageButton" Style="{StaticResource PrimaryButton}" Content="Şifreli Paketi Oluştur" HorizontalAlignment="Left" Margin="0,24,0,0" Click="BuildPackageButton_Click"/>
+                                <Border Background="#101923" CornerRadius="6" Padding="15" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Oyuna Özel Yama Uygulaması" FontSize="17" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Logo, arka plan, oyun ayarı ve güvenli istemciyi tek ZIP olarak hazırlar." Foreground="{StaticResource MutedBrush}" Margin="0,5,0,14"/>
+                                        <TextBlock Text="UCREW_SecurePatch.exe (bir kez seçilir)" Margin="0,0,0,5"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions>
+                                            <TextBox x:Name="ClientExePathBox"/>
+                                            <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="EXE Seç" Margin="10,0,0,0" Click="SelectClientExeButton_Click"/>
+                                        </Grid>
+                                        <Button x:Name="BuildClientPackageButton" Style="{StaticResource PrimaryButton}" Content="Oyuna Özel Uygulamayı Oluştur" HorizontalAlignment="Left" Margin="0,16,0,0" Click="BuildClientPackageButton_Click"/>
+                                        <TextBlock x:Name="ClientPackageResultText" Text="Henüz istemci paketi oluşturulmadı." Foreground="{StaticResource MutedBrush}" Margin="0,12,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
                                 <Border Background="#101923" CornerRadius="6" Padding="15" Margin="0,18,0,0">
                                     <TextBlock x:Name="BuildResultText" Text="Henüz paket oluşturulmadı." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"/>
                                 </Border>
