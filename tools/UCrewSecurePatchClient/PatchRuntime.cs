@@ -303,10 +303,23 @@ internal sealed class PatchRuntime
             throw new InvalidDataException("ZIP içinde güvenli olmayan yol: " + entry.FullName);
         }
 
-        string targetRoot = FileSystemUtil.ResolveSafePath(
-            _config.GameRoot,
-            profile.TargetPath,
-            allowEmpty: true);
+        string[] targetCandidates = (profile.TargetPaths ?? Array.Empty<string>())
+            .Concat(string.IsNullOrWhiteSpace(profile.TargetPath)
+                ? Array.Empty<string>()
+                : new[] { profile.TargetPath })
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        string targetRoot = _config.GameRoot;
+        if (targetCandidates.Length > 0)
+        {
+            string[] resolvedTargets = targetCandidates
+                .Select(value => FileSystemUtil.ResolveSafePath(_config.GameRoot, value))
+                .ToArray();
+            targetRoot = resolvedTargets.FirstOrDefault(Directory.Exists)
+                ?? resolvedTargets[0];
+        }
 
         string relativeTarget = profile.InstallMode.ToLowerInvariant() switch
         {
