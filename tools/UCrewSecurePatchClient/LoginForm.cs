@@ -26,6 +26,13 @@ internal sealed class LoginForm : Form
         Font = new Font("Segoe UI", 10f);
         AutoScaleMode = AutoScaleMode.Dpi;
 
+        string backgroundPath = ConfigLoader.ResolveAssetPath(config, config.BackgroundPath);
+        BackgroundImage = LoadImageUnlocked(backgroundPath);
+        BackgroundImageLayout = ImageLayout.Stretch;
+
+        string logoPath = ConfigLoader.ResolveAssetPath(config, config.LogoPath);
+        Image? logoImage = LoadImageUnlocked(logoPath);
+
         var title = new Label
         {
             Text = "U-CREW",
@@ -36,9 +43,24 @@ internal sealed class LoginForm : Form
         };
         Controls.Add(title);
 
+        if (logoImage is not null)
+        {
+            title.Visible = false;
+            Controls.Add(new PictureBox
+            {
+                Location = new Point(32, 18),
+                Size = new Size(250, 62),
+                BackColor = Color.Transparent,
+                SizeMode = PictureBoxSizeMode.Zoom,
+                Image = logoImage
+            });
+        }
+
         var subtitle = new Label
         {
-            Text = "Guardians Türkçe Yama",
+            Text = string.IsNullOrWhiteSpace(config.WindowTitle)
+                ? config.GameSlug + " Türkçe Yama"
+                : config.WindowTitle,
             Location = new Point(35, 70),
             Size = new Size(390, 28),
             ForeColor = Color.FromArgb(205, 211, 222)
@@ -151,6 +173,36 @@ internal sealed class LoginForm : Form
             _rememberBox.Enabled = true;
             _passwordBox.SelectAll();
             _passwordBox.Focus();
+        }
+    }
+
+    private static Image? LoadImageUnlocked(string path)
+    {
+        try
+        {
+            if (ConfigLoader.TryReadEmbeddedFile(path, out byte[] embeddedBytes))
+            {
+                using var memory = new MemoryStream(embeddedBytes, writable: false);
+                using Image embeddedImage = Image.FromStream(memory);
+                return new Bitmap(embeddedImage);
+            }
+
+            if (!File.Exists(path))
+            {
+                return null;
+            }
+
+            using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            using Image image = Image.FromStream(stream);
+            return new Bitmap(image);
+        }
+        catch
+        {
+            return null;
         }
     }
 
