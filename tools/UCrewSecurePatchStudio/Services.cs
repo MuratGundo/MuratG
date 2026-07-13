@@ -193,7 +193,22 @@ internal static class StudioValidation
     {
         profile.GameSlug = (profile.GameSlug ?? string.Empty).Trim().ToLowerInvariant();
         profile.GameName = (profile.GameName ?? string.Empty).Trim();
-        profile.GameExe = NormalizeRelativePath(profile.GameExe, "Oyun EXE");
+
+        string[] executableCandidates = (profile.GameExecutables ?? Array.Empty<string>())
+            .Concat(string.IsNullOrWhiteSpace(profile.GameExe)
+                ? Array.Empty<string>()
+                : new[] { profile.GameExe })
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => NormalizeRelativePath(value, "Oyun EXE"))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (executableCandidates.Length == 0)
+        {
+            throw new InvalidDataException("En az bir Steam veya Game Pass oyun EXE yolu girilmelidir.");
+        }
+        profile.GameExe = executableCandidates[0];
+        profile.GameExecutables = executableCandidates;
+
         profile.TargetPath = NormalizeRelativePath(
             profile.TargetPath,
             "Hedef klasör",
