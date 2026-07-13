@@ -31,6 +31,15 @@ internal static class Program
                 return;
             }
 
+            if (!TokenProvider.TryUseSavedSecurePatchSession())
+            {
+                using var loginForm = new LoginForm(config);
+                if (loginForm.ShowDialog() != DialogResult.OK)
+                {
+                    return;
+                }
+            }
+
             Application.Run(new LauncherForm(config));
         }
         catch (Exception exception)
