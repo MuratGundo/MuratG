@@ -3,7 +3,7 @@
 // Tüm oyunlar aynı uç noktayı kullanır; oyun seçimi slug ile yapılır.
 
 ob_start();
-require_once __DIR__ . '/../../includes/bootstrap.php';
+require_once __DIR__ . '/../includes/bootstrap.php';
 require_once __DIR__ . '/auth_v2.php';
 
 function ucrew_secure_out($data, $code = 200) {
