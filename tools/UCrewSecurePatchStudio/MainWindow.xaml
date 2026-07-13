@@ -140,7 +140,9 @@
                                         <PasswordBox x:Name="DatabasePasswordBox"/>
                                     </StackPanel>
                                 </Grid>
-                                <StackPanel Orientation="Horizontal" Margin="0,24,0,0">
+                                <TextBlock Text="SSH ve MySQL şifreleri bu Windows hesabına bağlı olarak şifreli saklanır; sonraki açılışta otomatik doldurulur."
+                                           Foreground="{StaticResource AccentBrush}" Margin="0,18,0,0" TextWrapping="Wrap"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
                                     <Button x:Name="DeployServerButton" Style="{StaticResource PrimaryButton}" Content="Sunucuyu Kur ve Test Et" Click="DeployServerButton_Click"/>
                                     <Button Style="{StaticResource SecondaryButton}" Content="Ayarları Kaydet" Margin="12,0,0,0" Click="SaveSettingsButton_Click"/>
                                 </StackPanel>
@@ -248,15 +250,15 @@
                                 <Border Background="#101923" CornerRadius="6" Padding="15" Margin="0,18,0,0">
                                     <StackPanel>
                                         <TextBlock Text="Oyuna Özel Yama Uygulaması" FontSize="17" FontWeight="SemiBold"/>
-                                        <TextBlock Text="Logo, arka plan, oyun ayarı ve güvenli istemciyi tek ZIP olarak hazırlar." Foreground="{StaticResource MutedBrush}" Margin="0,5,0,14"/>
-                                        <TextBlock Text="UCREW_SecurePatch.exe (bir kez seçilir)" Margin="0,0,0,5"/>
+                                        <TextBlock Text="Logo, arka plan ve oyun ayarlarını içine gömerek kullanıcıya tek EXE hazırlar." Foreground="{StaticResource MutedBrush}" Margin="0,5,0,14"/>
+                                        <TextBlock Text="Güncel güvenli istemci (Studio paketinden otomatik seçilir)" Margin="0,0,0,5"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions>
                                             <TextBox x:Name="ClientExePathBox"/>
                                             <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="EXE Seç" Margin="10,0,0,0" Click="SelectClientExeButton_Click"/>
                                         </Grid>
-                                        <Button x:Name="BuildClientPackageButton" Style="{StaticResource PrimaryButton}" Content="Oyuna Özel Uygulamayı Oluştur" HorizontalAlignment="Left" Margin="0,16,0,0" Click="BuildClientPackageButton_Click"/>
-                                        <TextBlock x:Name="ClientPackageResultText" Text="Henüz istemci paketi oluşturulmadı." Foreground="{StaticResource MutedBrush}" Margin="0,12,0,0" TextWrapping="Wrap"/>
+                                        <Button x:Name="BuildClientPackageButton" Style="{StaticResource PrimaryButton}" Content="Tek EXE Yama Uygulaması Oluştur" HorizontalAlignment="Left" Margin="0,16,0,0" Click="BuildClientPackageButton_Click"/>
+                                        <TextBlock x:Name="ClientPackageResultText" Text="Henüz tek EXE oluşturulmadı." Foreground="{StaticResource MutedBrush}" Margin="0,12,0,0" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </Border>
                                 <Border Background="#101923" CornerRadius="6" Padding="15" Margin="0,18,0,0">
