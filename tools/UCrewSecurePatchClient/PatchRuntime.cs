@@ -159,22 +159,43 @@ internal sealed class PatchRuntime
 
     public Process StartGame(RuntimeProfile profile)
     {
-        string configuredExe = string.IsNullOrWhiteSpace(_config.GameExe)
-            ? profile.GameExe
-            : _config.GameExe;
-        string gameExePath = FileSystemUtil.ResolveSafePath(_config.GameRoot, configuredExe);
+        string[] candidates = (_config.GameExecutables ?? Array.Empty<string>())
+            .Concat(string.IsNullOrWhiteSpace(_config.GameExe)
+                ? Array.Empty<string>()
+                : new[] { _config.GameExe })
+            .Concat(profile.GameExecutables ?? Array.Empty<string>())
+            .Concat(string.IsNullOrWhiteSpace(profile.GameExe)
+                ? Array.Empty<string>()
+                : new[] { profile.GameExe })
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
-        if (!File.Exists(gameExePath))
+        var checkedPaths = new List<string>();
+        string? gameExePath = null;
+        foreach (string candidate in candidates)
+        {
+            string candidatePath = FileSystemUtil.ResolveSafePath(_config.GameRoot, candidate);
+            checkedPaths.Add(candidatePath);
+            if (File.Exists(candidatePath))
+            {
+                gameExePath = candidatePath;
+                break;
+            }
+        }
+
+        if (gameExePath is null)
         {
             throw new FileNotFoundException(
-                "Oyun çalıştırma dosyası bulunamadı.",
-                gameExePath);
+                "Steam veya Game Pass oyun EXE'si bulunamadı. Kontrol edilen yollar:" +
+                Environment.NewLine + string.Join(Environment.NewLine, checkedPaths));
         }
 
         var startInfo = new ProcessStartInfo
         {
             FileName = gameExePath,
-            WorkingDirectory = _config.GameRoot,
+            WorkingDirectory = Path.GetDirectoryName(gameExePath) ?? _config.GameRoot,
             UseShellExecute = false,
             CreateNoWindow = true
         };
@@ -315,9 +336,10 @@ internal sealed class PatchRuntime
 
     private static void ValidateProfile(RuntimeProfile profile)
     {
-        if (string.IsNullOrWhiteSpace(profile.GameExe))
+        if (string.IsNullOrWhiteSpace(profile.GameExe) &&
+            (profile.GameExecutables is null || profile.GameExecutables.Length == 0))
         {
-            throw new InvalidDataException("Çalışma profilinde game_exe boş.");
+            throw new InvalidDataException("Çalışma profilinde game_exe veya game_exes boş.");
         }
 
         if (profile.AllowedExtensions is null || profile.AllowedExtensions.Length == 0)
