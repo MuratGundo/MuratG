@@ -26,6 +26,8 @@
   <ItemGroup>
     <EmbeddedResource Include="..\..\server\UCrewSecurePatch\api\secure_patch_request.php" LogicalName="ServerPayload.api.secure_patch_request.php" />
     <EmbeddedResource Include="..\..\server\UCrewSecurePatch\api\secure_patch_download.php" LogicalName="ServerPayload.api.secure_patch_download.php" />
+    <EmbeddedResource Include="..\..\server\UCrewSecurePatch\api\auth_v2.php" LogicalName="ServerPayload.api.auth_v2.php" />
+    <EmbeddedResource Include="..\..\server\UCrewSecurePatch\api\login.php" LogicalName="ServerPayload.api.login.php" />
     <EmbeddedResource Include="..\..\server\UCrewSecurePatch\database\INSTALL_SCHEMA.sql" LogicalName="ServerPayload.database.INSTALL_SCHEMA.sql" />
     <EmbeddedResource Include="..\..\server\UCrewSecurePatch\INSTALL_VPS.sh" LogicalName="ServerPayload.INSTALL_VPS.sh" />
   </ItemGroup>
