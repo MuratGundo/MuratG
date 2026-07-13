@@ -383,6 +383,7 @@ public partial class MainWindow : Window
 
                     File.Copy(logoPath, Path.Combine(staging, logoName), true);
                     File.Copy(backgroundPath, Path.Combine(staging, backgroundName), true);
+                    File.Copy(profilePath, Path.Combine(staging, "ucrew_profile.json"), true);
 
                     var gameConfig = new
                     {
