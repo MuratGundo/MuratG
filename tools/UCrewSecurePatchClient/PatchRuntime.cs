@@ -49,11 +49,12 @@ internal sealed class PatchRuntime
     {
         RuntimeProfile profile = preparedPatch.Ticket.RuntimeProfile;
         ValidateProfile(profile);
+        string gameRoot = ResolveGameRoot(profile);
 
         var session = new InstallSession
         {
             GameSlug = preparedPatch.Ticket.GameSlug,
-            GameRoot = _config.GameRoot,
+            GameRoot = gameRoot,
             CleanupOnExit = profile.CleanupOnExit
         };
 
@@ -94,7 +95,7 @@ internal sealed class PatchRuntime
                         "Paket profilin izin vermediği bir dosya içeriyor: " + entry.FullName);
                 }
 
-                string targetPath = ResolveEntryTarget(profile, entry);
+                string targetPath = ResolveEntryTarget(profile, entry, gameRoot);
                 if (!targetPaths.Add(targetPath))
                 {
                     throw new InvalidDataException(
@@ -159,24 +160,14 @@ internal sealed class PatchRuntime
 
     public Process StartGame(RuntimeProfile profile)
     {
-        string[] candidates = (_config.GameExecutables ?? Array.Empty<string>())
-            .Concat(string.IsNullOrWhiteSpace(_config.GameExe)
-                ? Array.Empty<string>()
-                : new[] { _config.GameExe })
-            .Concat(profile.GameExecutables ?? Array.Empty<string>())
-            .Concat(string.IsNullOrWhiteSpace(profile.GameExe)
-                ? Array.Empty<string>()
-                : new[] { profile.GameExe })
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        string gameRoot = ResolveGameRoot(profile);
+        string[] candidates = GetExecutableCandidates(profile);
 
         var checkedPaths = new List<string>();
         string? gameExePath = null;
         foreach (string candidate in candidates)
         {
-            string candidatePath = FileSystemUtil.ResolveSafePath(_config.GameRoot, candidate);
+            string candidatePath = FileSystemUtil.ResolveSafePath(gameRoot, candidate);
             checkedPaths.Add(candidatePath);
             if (File.Exists(candidatePath))
             {
@@ -195,7 +186,7 @@ internal sealed class PatchRuntime
         var startInfo = new ProcessStartInfo
         {
             FileName = gameExePath,
-            WorkingDirectory = Path.GetDirectoryName(gameExePath) ?? _config.GameRoot,
+            WorkingDirectory = Path.GetDirectoryName(gameExePath) ?? gameRoot,
             UseShellExecute = false,
             CreateNoWindow = true
         };
@@ -293,7 +284,7 @@ internal sealed class PatchRuntime
         }
     }
 
-    private string ResolveEntryTarget(RuntimeProfile profile, ZipArchiveEntry entry)
+    private string ResolveEntryTarget(RuntimeProfile profile, ZipArchiveEntry entry, string gameRoot)
     {
         string fullName = entry.FullName.Replace('\\', '/').TrimStart('/');
         string[] segments = fullName.Split('/', StringSplitOptions.RemoveEmptyEntries);
@@ -311,11 +302,11 @@ internal sealed class PatchRuntime
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        string targetRoot = _config.GameRoot;
+        string targetRoot = gameRoot;
         if (targetCandidates.Length > 0)
         {
             string[] resolvedTargets = targetCandidates
-                .Select(value => FileSystemUtil.ResolveSafePath(_config.GameRoot, value))
+                .Select(value => FileSystemUtil.ResolveSafePath(gameRoot, value))
                 .ToArray();
             targetRoot = resolvedTargets.FirstOrDefault(Directory.Exists)
                 ?? resolvedTargets[0];
@@ -334,6 +325,54 @@ internal sealed class PatchRuntime
         };
 
         return FileSystemUtil.ResolveSafePath(targetRoot, relativeTarget);
+    }
+
+    private string ResolveGameRoot(RuntimeProfile profile)
+    {
+        string[] candidates = GetExecutableCandidates(profile);
+        var roots = new List<string>();
+        DirectoryInfo? directory = new(Path.GetFullPath(_config.GameRoot));
+
+        for (int depth = 0; directory is not null && depth < 10; depth++, directory = directory.Parent)
+        {
+            roots.Add(directory.FullName);
+            foreach (string candidate in candidates)
+            {
+                try
+                {
+                    string executable = FileSystemUtil.ResolveSafePath(directory.FullName, candidate);
+                    if (File.Exists(executable))
+                    {
+                        _log("Oyun ana klasörü bulundu: " + directory.FullName);
+                        return directory.FullName;
+                    }
+                }
+                catch (InvalidDataException)
+                {
+                    // Bu üst klasör adayla güvenli şekilde birleştirilemiyorsa diğerini dene.
+                }
+            }
+        }
+
+        throw new FileNotFoundException(
+            "Steam veya Game Pass oyun klasörü bulunamadı. Aranan başlangıç klasörleri:" +
+            Environment.NewLine + string.Join(Environment.NewLine, roots));
+    }
+
+    private string[] GetExecutableCandidates(RuntimeProfile profile)
+    {
+        return (_config.GameExecutables ?? Array.Empty<string>())
+            .Concat(string.IsNullOrWhiteSpace(_config.GameExe)
+                ? Array.Empty<string>()
+                : new[] { _config.GameExe })
+            .Concat(profile.GameExecutables ?? Array.Empty<string>())
+            .Concat(string.IsNullOrWhiteSpace(profile.GameExe)
+                ? Array.Empty<string>()
+                : new[] { profile.GameExe })
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private void SaveSession(InstallSession session)
