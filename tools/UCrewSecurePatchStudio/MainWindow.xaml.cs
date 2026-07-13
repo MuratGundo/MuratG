@@ -655,13 +655,21 @@ public partial class MainWindow : Window
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
+        string[] targetCandidates = ProfileTargetBox.Text
+            .Split(new[] { '\r', '\n', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(value => value.Trim())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
         var profile = new GameProfile
         {
             GameSlug = ProfileSlugBox.Text.Trim(),
             GameName = ProfileNameBox.Text.Trim(),
             GameExe = executableCandidates.FirstOrDefault() ?? string.Empty,
             GameExecutables = executableCandidates,
-            TargetPath = ProfileTargetBox.Text.Trim(),
+            TargetPath = targetCandidates.FirstOrDefault() ?? string.Empty,
+            TargetPaths = targetCandidates,
             InstallMode = GetComboValue(ProfileInstallModeBox),
             AllowedExtensions = ProfileExtensionsBox.Text
                 .Split(new[] { '\r', '\n', ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries),
@@ -693,7 +701,12 @@ public partial class MainWindow : Window
                 ? profile.GameExecutables
                 : new[] { profile.GameExe })
             .Where(value => !string.IsNullOrWhiteSpace(value)));
-        ProfileTargetBox.Text = profile.TargetPath;
+        ProfileTargetBox.Text = string.Join(
+            "; ",
+            (profile.TargetPaths is { Length: > 0 }
+                ? profile.TargetPaths
+                : new[] { profile.TargetPath })
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
         ProfileExtensionsBox.Text = string.Join(Environment.NewLine, profile.AllowedExtensions);
         CleanupOnExitCheck.IsChecked = profile.CleanupOnExit;
         PreserveTreeCheck.IsChecked = profile.PreserveDirectoryTree;
