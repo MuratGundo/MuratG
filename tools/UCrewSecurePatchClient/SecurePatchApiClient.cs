@@ -70,6 +70,7 @@ internal sealed class SecurePatchApiClient
             hwid,
             cancellationToken).ConfigureAwait(false);
 
+        ApplyEmbeddedProfileFallback(ticket);
         ValidateTicket(ticket);
 
         string encryptedPath = Path.Combine(_cacheRoot, "patch.ucp");
@@ -383,6 +384,27 @@ internal sealed class SecurePatchApiClient
         }
     }
 
+    private void ApplyEmbeddedProfileFallback(TicketData ticket)
+    {
+        bool serverProfileUsable =
+            ticket.RuntimeProfile is not null &&
+            (!string.IsNullOrWhiteSpace(ticket.RuntimeProfile.GameExe) ||
+             (ticket.RuntimeProfile.GameExecutables is { Length: > 0 })) &&
+            ticket.RuntimeProfile.AllowedExtensions is { Length: > 0 } &&
+            !string.IsNullOrWhiteSpace(ticket.RuntimeProfile.InstallMode);
+
+        if (serverProfileUsable)
+        {
+            return;
+        }
+
+        if (ConfigLoader.TryLoadEmbeddedRuntimeProfile(out RuntimeProfile embeddedProfile))
+        {
+            ticket.RuntimeProfile = embeddedProfile;
+            _log("Sunucu çalışma profili boştu; tek EXE içine gömülü oyun profili kullanıldı.");
+        }
+    }
+
     private static void ValidateTicket(TicketData ticket)
     {
         if (string.IsNullOrWhiteSpace(ticket.DownloadUrl))
@@ -402,9 +424,12 @@ internal sealed class SecurePatchApiClient
         }
 
         if (ticket.RuntimeProfile is null ||
-            string.IsNullOrWhiteSpace(ticket.RuntimeProfile.GameExe))
+            (string.IsNullOrWhiteSpace(ticket.RuntimeProfile.GameExe) &&
+             (ticket.RuntimeProfile.GameExecutables is null ||
+              ticket.RuntimeProfile.GameExecutables.Length == 0)))
         {
-            throw new InvalidDataException("Sunucu geçerli oyun çalışma profili göndermedi.");
+            throw new InvalidDataException(
+                "Sunucu geçerli oyun çalışma profili göndermedi. game_exe veya game_exes boş.");
         }
     }
 

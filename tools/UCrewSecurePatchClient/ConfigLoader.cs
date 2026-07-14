@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 
@@ -5,6 +6,10 @@ namespace UCREW.SecurePatch;
 
 internal static class ConfigLoader
 {
+    private const string PayloadMagic = "UCREW_PAYLOAD_V1";
+    private static readonly Lazy<IReadOnlyDictionary<string, byte[]>?> EmbeddedFiles =
+        new(LoadEmbeddedFiles);
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -13,6 +18,12 @@ internal static class ConfigLoader
 
     public static ClientConfig Load(string[] args)
     {
+        if (TryReadEmbeddedFile("ucrew_game.json", out byte[] embeddedConfig))
+        {
+            string embeddedJson = Encoding.UTF8.GetString(embeddedConfig);
+            return ParseAndNormalize(embeddedJson, AppContext.BaseDirectory);
+        }
+
         string configPath = ResolveConfigPath(args);
 
         if (!File.Exists(configPath))
@@ -38,6 +49,68 @@ internal static class ConfigLoader
         }
 
         string json = File.ReadAllText(configPath, Encoding.UTF8);
+        string configDirectory = Path.GetDirectoryName(configPath) ?? AppContext.BaseDirectory;
+        return ParseAndNormalize(json, configDirectory);
+    }
+
+    public static bool TryReadEmbeddedFile(string path, out byte[] bytes)
+    {
+        bytes = Array.Empty<byte>();
+        IReadOnlyDictionary<string, byte[]>? files = EmbeddedFiles.Value;
+        if (files is null || string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        string name = Path.GetFileName(path);
+        return files.TryGetValue(name, out bytes!);
+    }
+
+    public static bool TryLoadEmbeddedRuntimeProfile(out RuntimeProfile profile)
+    {
+        profile = new RuntimeProfile();
+
+        if (!TryReadEmbeddedFile("ucrew_profile.json", out byte[] bytes))
+        {
+            return false;
+        }
+
+        try
+        {
+            RuntimeProfile? embedded = JsonSerializer.Deserialize<RuntimeProfile>(
+                Encoding.UTF8.GetString(bytes),
+                JsonOptions);
+            if (embedded is null)
+            {
+                return false;
+            }
+
+            profile = embedded;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static string ResolveAssetPath(ClientConfig config, string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+
+        if (Path.IsPathRooted(path))
+        {
+            return Path.GetFullPath(path);
+        }
+
+        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, path));
+    }
+
+    private static ClientConfig ParseAndNormalize(string json, string configDirectory)
+    {
         ClientConfig config = JsonSerializer.Deserialize<ClientConfig>(json, JsonOptions)
             ?? throw new InvalidDataException("İstemci yapılandırması boş.");
 
@@ -64,27 +137,85 @@ internal static class ConfigLoader
             throw new InvalidDataException("GameSlug geçersiz.");
         }
 
-        string configDirectory = Path.GetDirectoryName(configPath) ?? AppContext.BaseDirectory;
         string gameRootValue = string.IsNullOrWhiteSpace(config.GameRoot) ? "." : config.GameRoot.Trim();
         config.GameRoot = Path.GetFullPath(Path.Combine(configDirectory, gameRootValue));
+        config.GameExecutables = (config.GameExecutables ?? Array.Empty<string>())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         config.GameArguments ??= Array.Empty<string>();
 
         return config;
     }
 
-    public static string ResolveAssetPath(ClientConfig config, string path)
+    private static IReadOnlyDictionary<string, byte[]>? LoadEmbeddedFiles()
     {
-        if (string.IsNullOrWhiteSpace(path))
+        try
         {
-            return string.Empty;
-        }
+            string executablePath = Environment.ProcessPath
+                ?? throw new InvalidOperationException("Çalışan uygulamanın yolu bulunamadı.");
+            byte[] magic = Encoding.ASCII.GetBytes(PayloadMagic);
 
-        if (Path.IsPathRooted(path))
+            using var executable = new FileStream(
+                executablePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+
+            long footerSize = sizeof(long) + magic.Length;
+            if (executable.Length <= footerSize)
+            {
+                return null;
+            }
+
+            executable.Position = executable.Length - magic.Length;
+            byte[] actualMagic = new byte[magic.Length];
+            executable.ReadExactly(actualMagic);
+            if (!actualMagic.AsSpan().SequenceEqual(magic))
+            {
+                return null;
+            }
+
+            executable.Position = executable.Length - footerSize;
+            using var reader = new BinaryReader(executable, Encoding.UTF8, leaveOpen: true);
+            long payloadLength = reader.ReadInt64();
+            long payloadStart = executable.Length - footerSize - payloadLength;
+            if (payloadLength <= 0 || payloadStart < 0 || payloadLength > int.MaxValue)
+            {
+                throw new InvalidDataException("EXE içindeki U-CREW oyun paketi geçersiz.");
+            }
+
+            executable.Position = payloadStart;
+            byte[] payload = new byte[(int)payloadLength];
+            executable.ReadExactly(payload);
+
+            var files = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            using var memory = new MemoryStream(payload, writable: false);
+            using var archive = new ZipArchive(memory, ZipArchiveMode.Read, leaveOpen: false);
+            foreach (ZipArchiveEntry entry in archive.Entries)
+            {
+                if (string.IsNullOrEmpty(entry.Name))
+                {
+                    continue;
+                }
+
+                using Stream source = entry.Open();
+                using var destination = new MemoryStream();
+                source.CopyTo(destination);
+                files[entry.Name] = destination.ToArray();
+            }
+
+            return files;
+        }
+        catch (InvalidDataException)
         {
-            return Path.GetFullPath(path);
+            throw;
         }
-
-        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, path));
+        catch
+        {
+            return null;
+        }
     }
 
     private static string ResolveConfigPath(string[] args)

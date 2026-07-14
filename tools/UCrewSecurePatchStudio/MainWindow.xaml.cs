@@ -35,6 +35,7 @@ public partial class MainWindow : Window
         _logger.MessageWritten += Logger_MessageWritten;
 
         LoadSettingsToUi();
+        LoadBundledClient();
         LoadDefaultProfile();
         RefreshLogs();
         UpdatePublishSummary();
@@ -348,13 +349,15 @@ public partial class MainWindow : Window
             async (progress, token) =>
             {
                 string profilePath = Path.GetFullPath(BuildProfilePathBox.Text.Trim());
-                string clientExePath = Path.GetFullPath(ClientExePathBox.Text.Trim());
+                string clientExePath = ResolveClientExePath();
                 string outputRoot = Path.GetFullPath(BuildOutputPathBox.Text.Trim());
 
                 if (!File.Exists(profilePath))
                     throw new FileNotFoundException("Önce kaydedilmiş oyun profilini seçin.", profilePath);
                 if (!File.Exists(clientExePath))
-                    throw new FileNotFoundException("UCREW_SecurePatch.exe dosyasını seçin.", clientExePath);
+                    throw new FileNotFoundException(
+                        "Studio paketindeki güncel UCREW_SecurePatch.exe bulunamadı. Gerekirse dosyayı elle seçin.",
+                        clientExePath);
 
                 GameProfile profile = _profileService.Load(profilePath);
                 string logoPath = profile.Theme?.Logo ?? string.Empty;
@@ -370,6 +373,7 @@ public partial class MainWindow : Window
                     Path.GetTempPath(),
                     "UCREW_CLIENT_" + Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(staging);
+                string payloadPath = staging + ".zip";
 
                 try
                 {
@@ -377,9 +381,9 @@ public partial class MainWindow : Window
                     string logoName = "ucrew-logo" + Path.GetExtension(logoPath).ToLowerInvariant();
                     string backgroundName = "game-background" + Path.GetExtension(backgroundPath).ToLowerInvariant();
 
-                    File.Copy(clientExePath, Path.Combine(staging, "UCREW_SecurePatch.exe"), true);
                     File.Copy(logoPath, Path.Combine(staging, logoName), true);
                     File.Copy(backgroundPath, Path.Combine(staging, backgroundName), true);
+                    File.Copy(profilePath, Path.Combine(staging, "ucrew_profile.json"), true);
 
                     var gameConfig = new
                     {
@@ -392,6 +396,7 @@ public partial class MainWindow : Window
                             : BuildChannelBox.Text.Trim(),
                         GameRoot = ".",
                         GameExe = profile.GameExe,
+                        GameExecutables = profile.GameExecutables,
                         GameArguments = Array.Empty<string>(),
                         LogoPath = logoName,
                         BackgroundPath = backgroundName,
@@ -404,32 +409,39 @@ public partial class MainWindow : Window
                         Path.Combine(staging, "ucrew_game.json"),
                         JsonSerializer.Serialize(gameConfig, new JsonSerializerOptions { WriteIndented = true }),
                         new UTF8Encoding(false));
-                    File.WriteAllText(
-                        Path.Combine(staging, "KURULUM.txt"),
-                        "UCREW_SecurePatch.exe, ucrew_game.json, logo ve arka plan dosyalarını " +
-                        profile.GameExe + " dosyasının bulunduğu oyun klasörüne kopyalayın." +
-                        Environment.NewLine + "Ardından UCREW_SecurePatch.exe dosyasını çalıştırın.",
-                        new UTF8Encoding(false));
-
-                    progress.Report(65);
-                    string zipPath = Path.Combine(
+                    progress.Report(55);
+                    string exePath = Path.Combine(
                         outputRoot,
-                        "UCREW_" + profile.GameSlug + "_Guvenli_Yama_Uygulamasi.zip");
-                    if (File.Exists(zipPath))
-                        File.Delete(zipPath);
+                        "UCREW_" + profile.GameSlug + "_Turkce_Yama.exe");
+                    if (File.Exists(exePath))
+                        File.Delete(exePath);
+                    if (File.Exists(payloadPath))
+                        File.Delete(payloadPath);
 
-                    await Task.Run(
-                        () => ZipFile.CreateFromDirectory(
+                    await Task.Run(() =>
+                    {
+                        ZipFile.CreateFromDirectory(
                             staging,
-                            zipPath,
+                            payloadPath,
                             CompressionLevel.Optimal,
-                            includeBaseDirectory: false),
-                        token);
+                            includeBaseDirectory: false);
+
+                        using var output = new FileStream(exePath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                        using (FileStream client = File.OpenRead(clientExePath))
+                            client.CopyTo(output);
+                        using (FileStream payload = File.OpenRead(payloadPath))
+                            payload.CopyTo(output);
+
+                        using var writer = new BinaryWriter(output, Encoding.UTF8, leaveOpen: true);
+                        writer.Write(new FileInfo(payloadPath).Length);
+                        writer.Write(Encoding.ASCII.GetBytes("UCREW_PAYLOAD_V1"));
+                        output.Flush(flushToDisk: true);
+                    }, token);
 
                     progress.Report(100);
-                    ClientPackageResultText.Text = "Hazır: " + zipPath;
+                    ClientPackageResultText.Text = "Tek EXE hazır: " + exePath;
                     MessageBox.Show(
-                        "Oyuna özel U-CREW yama uygulaması başarıyla oluşturuldu.",
+                        "Logo, arka plan ve oyun ayarları içine gömülmüş tek EXE başarıyla oluşturuldu.",
                         "U-CREW Studio",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
@@ -438,6 +450,8 @@ public partial class MainWindow : Window
                 {
                     if (Directory.Exists(staging))
                         Directory.Delete(staging, true);
+                    if (File.Exists(payloadPath))
+                        File.Delete(payloadPath);
                 }
             });
     }
@@ -553,6 +567,27 @@ public partial class MainWindow : Window
         }
     }
 
+    private void LoadBundledClient()
+    {
+        string bundledClient = Path.Combine(AppContext.BaseDirectory, "UCREW_SecurePatch.exe");
+        if (File.Exists(bundledClient))
+        {
+            ClientExePathBox.Text = bundledClient;
+            _logger.Write("Güncel güvenli yama istemcisi Studio paketinden otomatik seçildi.");
+        }
+    }
+
+    private string ResolveClientExePath()
+    {
+        string selected = ClientExePathBox.Text.Trim();
+        if (!string.IsNullOrWhiteSpace(selected))
+        {
+            return Path.GetFullPath(selected);
+        }
+
+        return Path.Combine(AppContext.BaseDirectory, "UCREW_SecurePatch.exe");
+    }
+
     private void LoadSettingsToUi()
     {
         HostBox.Text = _settings.Host;
@@ -560,6 +595,8 @@ public partial class MainWindow : Window
         SshUserBox.Text = _settings.SshUser;
         DatabaseBox.Text = _settings.DatabaseName;
         DatabaseUserBox.Text = _settings.DatabaseUser;
+        SshPasswordBox.Password = _settingsService.UnprotectSecret(_settings.EncryptedSshPassword);
+        DatabasePasswordBox.Password = _settingsService.UnprotectSecret(_settings.EncryptedDatabasePassword);
         BuildProfilePathBox.Text = _settings.LastProfilePath;
         BuildSourcePathBox.Text = _settings.LastSourcePath;
         BuildOutputPathBox.Text = _settings.LastOutputPath;
@@ -573,6 +610,12 @@ public partial class MainWindow : Window
         _settings.SshUser = SshUserBox.Text.Trim();
         _settings.DatabaseName = DatabaseBox.Text.Trim();
         _settings.DatabaseUser = DatabaseUserBox.Text.Trim();
+
+        if (!string.IsNullOrEmpty(SshPasswordBox.Password))
+            _settings.EncryptedSshPassword = _settingsService.ProtectSecret(SshPasswordBox.Password);
+        if (!string.IsNullOrEmpty(DatabasePasswordBox.Password))
+            _settings.EncryptedDatabasePassword = _settingsService.ProtectSecret(DatabasePasswordBox.Password);
+
         StudioValidation.ValidateServerSettings(_settings);
         UpdatePublishSummary();
     }
@@ -606,12 +649,28 @@ public partial class MainWindow : Window
 
     private GameProfile ReadProfileFromUi()
     {
+        string[] executableCandidates = ProfileExeBox.Text
+            .Split(new[] { '\r', '\n', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(value => value.Trim())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        string[] targetCandidates = ProfileTargetBox.Text
+            .Split(new[] { '\r', '\n', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(value => value.Trim())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
         var profile = new GameProfile
         {
             GameSlug = ProfileSlugBox.Text.Trim(),
             GameName = ProfileNameBox.Text.Trim(),
-            GameExe = ProfileExeBox.Text.Trim(),
-            TargetPath = ProfileTargetBox.Text.Trim(),
+            GameExe = executableCandidates.FirstOrDefault() ?? string.Empty,
+            GameExecutables = executableCandidates,
+            TargetPath = targetCandidates.FirstOrDefault() ?? string.Empty,
+            TargetPaths = targetCandidates,
             InstallMode = GetComboValue(ProfileInstallModeBox),
             AllowedExtensions = ProfileExtensionsBox.Text
                 .Split(new[] { '\r', '\n', ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries),
@@ -637,8 +696,18 @@ public partial class MainWindow : Window
     {
         ProfileSlugBox.Text = profile.GameSlug;
         ProfileNameBox.Text = profile.GameName;
-        ProfileExeBox.Text = profile.GameExe;
-        ProfileTargetBox.Text = profile.TargetPath;
+        ProfileExeBox.Text = string.Join(
+            "; ",
+            (profile.GameExecutables is { Length: > 0 }
+                ? profile.GameExecutables
+                : new[] { profile.GameExe })
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+        ProfileTargetBox.Text = string.Join(
+            "; ",
+            (profile.TargetPaths is { Length: > 0 }
+                ? profile.TargetPaths
+                : new[] { profile.TargetPath })
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
         ProfileExtensionsBox.Text = string.Join(Environment.NewLine, profile.AllowedExtensions);
         CleanupOnExitCheck.IsChecked = profile.CleanupOnExit;
         PreserveTreeCheck.IsChecked = profile.PreserveDirectoryTree;

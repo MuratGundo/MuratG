@@ -104,6 +104,43 @@ internal sealed class SettingsService
         }
     }
 
+    public string ProtectSecret(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        byte[] plain = Encoding.UTF8.GetBytes(value);
+        byte[] encrypted = ProtectedData.Protect(
+            plain,
+            optionalEntropy: null,
+            DataProtectionScope.CurrentUser);
+        return Convert.ToBase64String(encrypted);
+    }
+
+    public string UnprotectSecret(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            byte[] encrypted = Convert.FromBase64String(value);
+            byte[] plain = ProtectedData.Unprotect(
+                encrypted,
+                optionalEntropy: null,
+                DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(plain);
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
     public void Save(StudioSettings settings)
     {
         File.WriteAllText(
@@ -156,11 +193,32 @@ internal static class StudioValidation
     {
         profile.GameSlug = (profile.GameSlug ?? string.Empty).Trim().ToLowerInvariant();
         profile.GameName = (profile.GameName ?? string.Empty).Trim();
-        profile.GameExe = NormalizeRelativePath(profile.GameExe, "Oyun EXE");
-        profile.TargetPath = NormalizeRelativePath(
-            profile.TargetPath,
-            "Hedef klasör",
-            allowEmpty: true);
+
+        string[] executableCandidates = (profile.GameExecutables ?? Array.Empty<string>())
+            .Concat(string.IsNullOrWhiteSpace(profile.GameExe)
+                ? Array.Empty<string>()
+                : new[] { profile.GameExe })
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => NormalizeRelativePath(value, "Oyun EXE"))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (executableCandidates.Length == 0)
+        {
+            throw new InvalidDataException("En az bir Steam veya Game Pass oyun EXE yolu girilmelidir.");
+        }
+        profile.GameExe = executableCandidates[0];
+        profile.GameExecutables = executableCandidates;
+
+        string[] targetCandidates = (profile.TargetPaths ?? Array.Empty<string>())
+            .Concat(string.IsNullOrWhiteSpace(profile.TargetPath)
+                ? Array.Empty<string>()
+                : new[] { profile.TargetPath })
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => NormalizeRelativePath(value, "Hedef klasör"))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        profile.TargetPath = targetCandidates.FirstOrDefault() ?? string.Empty;
+        profile.TargetPaths = targetCandidates;
         profile.InstallMode = (profile.InstallMode ?? string.Empty).Trim().ToLowerInvariant();
         profile.BootstrapType = string.IsNullOrWhiteSpace(profile.BootstrapType)
             ? "launcher"
@@ -578,12 +636,30 @@ internal sealed class PackageBuilderService
             new JsonSerializerOptions { PropertyNamingPolicy = null });
         string slug = StudioValidation.SqlEscape(metadata.GameSlug);
         string channel = StudioValidation.SqlEscape(metadata.Channel);
+        string title = StudioValidation.SqlEscape(metadata.GameName);
+        string shortName = StudioValidation.SqlEscape(
+            metadata.GameName.Length > 80 ? metadata.GameName[..80] : metadata.GameName);
+        string gameVersion = StudioValidation.SqlEscape(metadata.Version);
 
         return $"""
 -- U-CREW genel güvenli yama kaydı
 -- Oyun: {metadata.GameName}
 -- Sürüm: {metadata.Version}
 -- Paket: {metadata.ServerRelativePath}
+
+-- Oyun panelde yoksa otomatik oluştur.
+INSERT IGNORE INTO games
+(id, slug, title, short_name, current_version, status, created_at, updated_at)
+SELECT
+    ids.next_id,
+    '{slug}',
+    '{title}',
+    '{shortName}',
+    '{gameVersion}',
+    'active',
+    NOW(),
+    NOW()
+FROM (SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM games) AS ids;
 
 SET @ucrew_game_id := (
     SELECT id FROM games WHERE LOWER(slug)=LOWER('{slug}') LIMIT 1
@@ -793,6 +869,32 @@ internal sealed class ServerDeploymentService
         return root;
     }
 
+    private static string BuildEnsureGameSql(PatchMetadata metadata)
+    {
+        string slug = StudioValidation.SqlEscape(metadata.GameSlug);
+        string title = StudioValidation.SqlEscape(metadata.GameName);
+        string shortName = StudioValidation.SqlEscape(
+            metadata.GameName.Length > 80 ? metadata.GameName[..80] : metadata.GameName);
+        string version = StudioValidation.SqlEscape(metadata.Version);
+
+        return $"""
+INSERT IGNORE INTO games
+(id, slug, title, short_name, current_version, status, created_at, updated_at)
+SELECT
+    ids.next_id,
+    '{slug}',
+    '{title}',
+    '{shortName}',
+    '{version}',
+    'active',
+    NOW(),
+    NOW()
+FROM (SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM games) AS ids;
+
+SELECT id FROM games WHERE LOWER(slug)=LOWER('{slug}') LIMIT 1;
+""";
+    }
+
     private static string BuildMySqlImportCommand(
         StudioSettings settings,
         string databasePassword,
@@ -904,6 +1006,19 @@ internal sealed class PatchPublisherService
             sftp.Connect();
             progress?.Report(10);
 
+            string ensureGameCommand = BuildMySqlQueryCommand(
+                settings,
+                databasePassword,
+                BuildEnsureGameSql(metadata));
+            string ensuredGameId = Execute(ssh, ensureGameCommand).Trim();
+            if (!uint.TryParse(ensuredGameId, out uint gameId) || gameId == 0)
+            {
+                throw new InvalidOperationException(
+                    "Oyun veritabanında otomatik oluşturulamadı: " + metadata.GameSlug);
+            }
+            _logger.Write($"Oyun kaydı hazır: {metadata.GameSlug}, ID={gameId}");
+            progress?.Report(15);
+
             string remoteDirectory =
                 "/var/www/api.u-crew.net/secure_patches/" + metadata.GameSlug;
             string remotePackage = remoteDirectory + "/" + metadata.EncryptedFile;
@@ -956,8 +1071,18 @@ internal sealed class PatchPublisherService
                 settings,
                 databasePassword,
                 query);
-            string verifyOutput = Execute(ssh, verifyCommand);
-            _logger.Write("Yayın doğrulaması: " + verifyOutput.Trim());
+            string verifyOutput = Execute(ssh, verifyCommand).Trim();
+            _logger.Write("Yayın doğrulaması: " + verifyOutput);
+
+            if (string.IsNullOrWhiteSpace(verifyOutput) ||
+                !verifyOutput.Contains(metadata.EncryptedFile, StringComparison.OrdinalIgnoreCase) ||
+                !verifyOutput.Contains("active", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "Dosya sunucuya aktarıldı ancak veritabanı kaydı doğrulanamadı. " +
+                    "Studio başarı mesajı vermedi; günlükleri kontrol edin.");
+            }
+
             progress?.Report(100);
 
             return new OperationResult(
@@ -965,6 +1090,32 @@ internal sealed class PatchPublisherService
                 $"{metadata.GameName} {metadata.Version} başarıyla yayınlandı.",
                 verifyOutput.Trim());
         }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static string BuildEnsureGameSql(PatchMetadata metadata)
+    {
+        string slug = StudioValidation.SqlEscape(metadata.GameSlug);
+        string title = StudioValidation.SqlEscape(metadata.GameName);
+        string shortName = StudioValidation.SqlEscape(
+            metadata.GameName.Length > 80 ? metadata.GameName[..80] : metadata.GameName);
+        string version = StudioValidation.SqlEscape(metadata.Version);
+
+        return $"""
+INSERT IGNORE INTO games
+(id, slug, title, short_name, current_version, status, created_at, updated_at)
+SELECT
+    ids.next_id,
+    '{slug}',
+    '{title}',
+    '{shortName}',
+    '{version}',
+    'active',
+    NOW(),
+    NOW()
+FROM (SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM games) AS ids;
+
+SELECT id FROM games WHERE LOWER(slug)=LOWER('{slug}') LIMIT 1;
+""";
     }
 
     private static string BuildMySqlImportCommand(
