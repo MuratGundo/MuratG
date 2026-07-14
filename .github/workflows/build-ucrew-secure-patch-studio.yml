@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - ".github/workflows/build-ucrew-secure-patch-studio.yml"
+      - "MuratG.sln"
       - "tools/UCrewSecurePatchStudio/**"
       - "server/UCrewSecurePatch/api/**"
       - "server/UCrewSecurePatch/database/**"
