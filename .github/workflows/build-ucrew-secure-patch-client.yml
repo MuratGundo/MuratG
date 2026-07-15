@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - ".github/workflows/build-ucrew-secure-patch-client.yml"
+      - "MuratG.sln"
       - "tools/UCrewSecurePatchClient/**"
   pull_request:
     paths:
