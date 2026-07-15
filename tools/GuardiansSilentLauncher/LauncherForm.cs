@@ -5,8 +5,14 @@ namespace UCREW.GuardiansTR;
 
 internal sealed class LauncherForm : Form
 {
+    private const string ParentPidPrefix = "--ucrew-parent-pid=";
+    private const string ReadyEventPrefix = "--ucrew-ready-event=";
+
     private readonly LauncherEngine _engine;
     private readonly CancellationTokenSource _cancellation = new();
+    private readonly int? _parentProcessId;
+    private readonly string? _readyEventName;
+    private readonly bool _preloadMode;
 
     private readonly Label _statusLabel;
     private readonly Label _detailLabel;
@@ -16,10 +22,22 @@ internal sealed class LauncherForm : Form
 
     private bool _allowClose;
     private bool _started;
+    private bool _readySignaled;
 
     public LauncherForm(IReadOnlyList<string> arguments)
     {
-        _engine = new LauncherEngine(arguments);
+        _parentProcessId = ParseParentProcessId(arguments);
+        _readyEventName = ParseArgument(arguments, ReadyEventPrefix);
+        _preloadMode = _parentProcessId.HasValue &&
+            !string.IsNullOrWhiteSpace(_readyEventName);
+
+        string[] gameArguments = arguments
+            .Where(argument =>
+                !argument.StartsWith(ParentPidPrefix, StringComparison.OrdinalIgnoreCase) &&
+                !argument.StartsWith(ReadyEventPrefix, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        _engine = new LauncherEngine(gameArguments);
 
         SuspendLayout();
 
@@ -197,21 +215,34 @@ internal sealed class LauncherForm : Form
                 () => _engine.PreparePatch(progress, _cancellation.Token),
                 _cancellation.Token);
 
-            await Task.Delay(850, _cancellation.Token);
+            await Task.Delay(650, _cancellation.Token);
 
             SetProgress(
                 100,
-                "Oyun başlatılıyor…",
-                "Türkçe yama etkin. İyi oyunlar!");
+                _preloadMode ? "Yama kuruldu." : "Oyun başlatılıyor…",
+                _preloadMode
+                    ? "Guardians.exe Türkçe olarak açılıyor."
+                    : "Türkçe yama etkin. İyi oyunlar!");
 
-            await Task.Delay(650, _cancellation.Token);
+            await Task.Delay(500, _cancellation.Token);
 
-            using Process process = _engine.StartGame();
+            if (_preloadMode)
+            {
+                SignalReadyEvent();
+                Hide();
 
-            Hide();
-            await process.WaitForExitAsync();
+                await WaitForParentGameAsync();
+                await Task.Run(_engine.Cleanup);
+            }
+            else
+            {
+                using Process process = _engine.StartGame();
 
-            await Task.Run(_engine.Cleanup);
+                Hide();
+                await process.WaitForExitAsync();
+
+                await Task.Run(_engine.Cleanup);
+            }
 
             _allowClose = true;
             Close();
@@ -238,6 +269,50 @@ internal sealed class LauncherForm : Form
                 MessageBoxIcon.Error);
 
             Close();
+        }
+    }
+
+    private async Task WaitForParentGameAsync()
+    {
+        if (!_parentProcessId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            using Process parent = Process.GetProcessById(_parentProcessId.Value);
+            await parent.WaitForExitAsync();
+        }
+        catch (ArgumentException)
+        {
+            // Oyun bu sırada zaten kapanmış olabilir.
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private void SignalReadyEvent()
+    {
+        if (_readySignaled || string.IsNullOrWhiteSpace(_readyEventName))
+        {
+            return;
+        }
+
+        try
+        {
+            using EventWaitHandle readyEvent =
+                EventWaitHandle.OpenExisting(_readyEventName);
+
+            readyEvent.Set();
+            _readySignaled = true;
+        }
+        catch (WaitHandleCannotBeOpenedException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 
@@ -307,6 +382,29 @@ internal sealed class LauncherForm : Form
 
         return (int)Math.Round(
             (_progressFill.Width / (double)_progressTrack.ClientSize.Width) * 100d);
+    }
+
+    private static int? ParseParentProcessId(IReadOnlyList<string> arguments)
+    {
+        string? value = ParseArgument(arguments, ParentPidPrefix);
+        return int.TryParse(value, out int processId) && processId > 0
+            ? processId
+            : null;
+    }
+
+    private static string? ParseArgument(
+        IReadOnlyList<string> arguments,
+        string prefix)
+    {
+        foreach (string argument in arguments)
+        {
+            if (argument.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return argument[prefix.Length..].Trim();
+            }
+        }
+
+        return null;
     }
 
     private static Image? LoadImageUnlocked(string path)
